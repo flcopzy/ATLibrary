@@ -1,0 +1,84 @@
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>
+        <ProjectGuid>{B7B30C99-5AC2-4497-A12C-9E0AA5521F6A}</ProjectGuid>
+    </PropertyGroup>
+    <ItemGroup>
+        <Projects Include="DllLoader\DllLoader.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="DllLoader\Dll.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="Logger\VCLLogger\VCLLogger.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="TimeWatcher\TimeWatcherDemo.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="Configurator\ConfigViewer\ConfigViewer.dproj">
+            <Dependencies/>
+        </Projects>
+    </ItemGroup>
+    <ProjectExtensions>
+        <Borland.Personality>Default.Personality.12</Borland.Personality>
+        <Borland.ProjectType/>
+        <BorlandProject>
+            <Default.Personality/>
+        </BorlandProject>
+    </ProjectExtensions>
+    <Target Name="DllLoader">
+        <MSBuild Projects="DllLoader\DllLoader.dproj"/>
+    </Target>
+    <Target Name="DllLoader:Clean">
+        <MSBuild Projects="DllLoader\DllLoader.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="DllLoader:Make">
+        <MSBuild Projects="DllLoader\DllLoader.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="Dll">
+        <MSBuild Projects="DllLoader\Dll.dproj"/>
+    </Target>
+    <Target Name="Dll:Clean">
+        <MSBuild Projects="DllLoader\Dll.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="Dll:Make">
+        <MSBuild Projects="DllLoader\Dll.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="VCLLogger">
+        <MSBuild Projects="Logger\VCLLogger\VCLLogger.dproj"/>
+    </Target>
+    <Target Name="VCLLogger:Clean">
+        <MSBuild Projects="Logger\VCLLogger\VCLLogger.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="VCLLogger:Make">
+        <MSBuild Projects="Logger\VCLLogger\VCLLogger.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="TimeWatcherDemo">
+        <MSBuild Projects="TimeWatcher\TimeWatcherDemo.dproj"/>
+    </Target>
+    <Target Name="TimeWatcherDemo:Clean">
+        <MSBuild Projects="TimeWatcher\TimeWatcherDemo.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="TimeWatcherDemo:Make">
+        <MSBuild Projects="TimeWatcher\TimeWatcherDemo.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="ConfigViewer">
+        <MSBuild Projects="Configurator\ConfigViewer\ConfigViewer.dproj"/>
+    </Target>
+    <Target Name="ConfigViewer:Clean">
+        <MSBuild Projects="Configurator\ConfigViewer\ConfigViewer.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="ConfigViewer:Make">
+        <MSBuild Projects="Configurator\ConfigViewer\ConfigViewer.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="Build">
+        <CallTarget Targets="DllLoader;Dll;VCLLogger;TimeWatcherDemo;ConfigViewer"/>
+    </Target>
+    <Target Name="Clean">
+        <CallTarget Targets="DllLoader:Clean;Dll:Clean;VCLLogger:Clean;TimeWatcherDemo:Clean;ConfigViewer:Clean"/>
+    </Target>
+    <Target Name="Make">
+        <CallTarget Targets="DllLoader:Make;Dll:Make;VCLLogger:Make;TimeWatcherDemo:Make;ConfigViewer:Make"/>
+    </Target>
+    <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
+</Project>

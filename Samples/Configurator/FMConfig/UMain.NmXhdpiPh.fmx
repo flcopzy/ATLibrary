@@ -1,0 +1,50 @@
+inherited Form1_NmXhdpiPh: TForm1_NmXhdpiPh
+  ClientHeight = 615
+  ClientWidth = 400
+  DesignerMasterStyle = 0
+  inherited BSetConfig: TButton
+    Position.Y = 169.000000000000000000
+    Size.Width = 400.000000000000000000
+  end
+  inherited Layout1: TLayout
+    Size.Width = 400.000000000000000000
+  end
+  inherited Layout2: TLayout
+    Size.Width = 400.000000000000000000
+    Size.Height = 120.000000000000000000
+    inherited EGroup: TEdit
+      Position.Y = 79.000000000000000000
+    end
+    inherited EValue: TEdit
+      Position.Y = 41.000000000000000000
+    end
+    inherited Label2: TLabel
+      Position.Y = 43.000000000000000000
+    end
+    inherited Label3: TLabel
+      Position.Y = 81.000000000000000000
+    end
+  end
+  inherited TabControl1: TTabControl
+    Size.Width = 400.000000000000000000
+    Size.Height = 365.000000000000000000
+    inherited TabItem1: TTabItem
+      Size.Width = 200.000000000000000000
+      inherited MStdConfig: TMemo
+        Size.Width = 400.000000000000000000
+        Size.Height = 316.000000000000000000
+      end
+    end
+    inherited TabItem2: TTabItem
+      Size.Width = 200.000000000000000000
+      inherited MConfig: TMemo
+        Size.Width = 400.000000000000000000
+        Size.Height = 316.000000000000000000
+      end
+    end
+  end
+  inherited Layout3: TLayout
+    Position.Y = 575.000000000000000000
+    Size.Width = 400.000000000000000000
+  end
+end

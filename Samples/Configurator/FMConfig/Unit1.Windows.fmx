@@ -1,0 +1,13 @@
+inherited Form1_Windows: TForm1_Windows
+  DesignerMasterStyle = 0
+  inherited Layout2: TLayout
+    inherited Button1: TButton
+      Position.X = 24.000000000000000000
+    end
+  end
+  inherited TabControl1: TTabControl
+    inherited TabItem2: TTabItem
+      Size.Width = 171.000000000000000000
+    end
+  end
+end

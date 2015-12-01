@@ -1,0 +1,8 @@
+inherited Form1_Windows: TForm1_Windows
+  DesignerMasterStyle = 0
+  inherited TabControl1: TTabControl
+    inherited TabItem2: TTabItem
+      Size.Width = 171.000000000000000000
+    end
+  end
+end

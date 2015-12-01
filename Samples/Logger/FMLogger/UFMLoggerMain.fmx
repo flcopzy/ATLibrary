@@ -1,0 +1,102 @@
+object Form1: TForm1
+  Left = 0
+  Top = 0
+  Caption = 'Form1'
+  ClientHeight = 508
+  ClientWidth = 320
+  FormFactor.Width = 320
+  FormFactor.Height = 480
+  FormFactor.Devices = [Desktop, iPhone, iPad]
+  OnCreate = FormCreate
+  OnDestroy = FormDestroy
+  DesignerMasterStyle = 3
+  object MInfo: TMemo
+    Touch.InteractiveGestures = [Pan, LongTap, DoubleTap]
+    Align = Client
+    Size.Width = 320.000000000000000000
+    Size.Height = 235.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 0
+  end
+  object Layout1: TLayout
+    Align = Top
+    Size.Width = 320.000000000000000000
+    Size.Height = 273.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 1
+    object BDefLog: TButton
+      Position.X = 12.000000000000000000
+      Position.Y = 99.000000000000000000
+      Size.Width = 297.000000000000000000
+      Size.Height = 48.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 0
+      Text = 'Def Logger write(plz see monitor)'
+      OnClick = BDefLogClick
+    end
+    object BThreadsWrite: TButton
+      Position.X = 12.000000000000000000
+      Position.Y = 158.000000000000000000
+      Size.Width = 297.000000000000000000
+      Size.Height = 44.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 1
+      Text = 'Threads write'
+      OnClick = BThreadsWriteClick
+    end
+    object BCleanLogFiles: TButton
+      Position.X = 12.000000000000000000
+      Position.Y = 213.000000000000000000
+      Size.Width = 297.000000000000000000
+      Size.Height = 44.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 3
+      Text = 'Clean log files'
+      OnClick = BCleanLogFilesClick
+    end
+    object Switch1: TSwitch
+      IsChecked = True
+      Position.X = 117.000000000000000000
+      Position.Y = 16.000000000000000000
+      Size.Width = 76.000000000000000000
+      Size.Height = 26.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 2
+      OnSwitch = Switch1Switch
+    end
+    object Label1: TLabel
+      Position.X = 26.000000000000000000
+      Position.Y = 18.000000000000000000
+      Size.Width = 90.000000000000000000
+      Size.Height = 23.000000000000000000
+      Size.PlatformDefault = False
+      Text = 'Enabled  :'
+    end
+    object ComboBox1: TComboBox
+      Items.Strings = (
+        'llAll'
+        'llTrace'
+        'llDebug'
+        'llInfo'
+        'llWarn'
+        'llError'
+        'llFatal'
+        'llOff')
+      Position.X = 115.000000000000000000
+      Position.Y = 52.000000000000000000
+      Size.Width = 190.000000000000000000
+      Size.Height = 32.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 4
+      OnChange = ComboBox1Change
+    end
+    object Label2: TLabel
+      Position.X = 26.000000000000000000
+      Position.Y = 62.000000000000000000
+      Size.Width = 82.000000000000000000
+      Size.Height = 23.000000000000000000
+      Size.PlatformDefault = False
+      Text = 'LogLevel:'
+    end
+  end
+end

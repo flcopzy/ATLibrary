@@ -1,0 +1,210 @@
+object Form1: TForm1
+  Left = 0
+  Top = 0
+  Caption = 'Form1'
+  ClientHeight = 494
+  ClientWidth = 347
+  FormFactor.Width = 320
+  FormFactor.Height = 480
+  FormFactor.Devices = [Desktop]
+  DesignerMasterStyle = 3
+  object BSetConfig: TButton
+    Align = Top
+    Position.Y = 185.000000000000000000
+    Size.Width = 347.000000000000000000
+    Size.Height = 41.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 1
+    Text = 'SetConfig'
+    OnClick = BSetConfigClick
+  end
+  object Layout1: TLayout
+    Align = Top
+    Size.Width = 347.000000000000000000
+    Size.Height = 49.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 10
+    object RIni: TRadioButton
+      Tag = 1
+      Position.X = 16.000000000000000000
+      Position.Y = 16.000000000000000000
+      Size.Width = 65.000000000000000000
+      Size.Height = 19.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 3
+      Text = 'Ini'
+      OnClick = RIniClick
+    end
+    object RXML: TRadioButton
+      Tag = 2
+      Position.X = 84.000000000000000000
+      Position.Y = 16.000000000000000000
+      Size.Width = 74.000000000000000000
+      Size.Height = 19.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 2
+      Text = 'XML'
+      OnClick = RIniClick
+    end
+    object RJSON: TRadioButton
+      Tag = 3
+      Position.X = 164.000000000000000000
+      Position.Y = 16.000000000000000000
+      Size.Width = 81.000000000000000000
+      Size.Height = 19.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 1
+      Text = 'JSON'
+      OnClick = RIniClick
+    end
+    object RDB: TRadioButton
+      Tag = 4
+      Position.X = 248.000000000000000000
+      Position.Y = 16.000000000000000000
+      Size.Width = 81.000000000000000000
+      Size.Height = 19.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 0
+      Text = 'SQlite'
+      OnClick = RIniClick
+    end
+  end
+  object Layout2: TLayout
+    Align = Top
+    Position.Y = 49.000000000000000000
+    Size.Width = 347.000000000000000000
+    Size.Height = 136.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 11
+    object EKey: TEdit
+      Touch.InteractiveGestures = [LongTap, DoubleTap]
+      Anchors = [akLeft, akTop, akRight]
+      TabOrder = 0
+      Position.X = 73.000000000000000000
+      Position.Y = 5.000000000000000000
+      Size.Width = 258.000000000000000000
+      Size.Height = 32.000000000000000000
+      Size.PlatformDefault = False
+    end
+    object EGroup: TEdit
+      Touch.InteractiveGestures = [LongTap, DoubleTap]
+      Anchors = [akLeft, akTop, akRight]
+      TabOrder = 1
+      Position.X = 73.000000000000000000
+      Position.Y = 88.000000000000000000
+      Size.Width = 258.000000000000000000
+      Size.Height = 32.000000000000000000
+      Size.PlatformDefault = False
+    end
+    object EValue: TEdit
+      Touch.InteractiveGestures = [LongTap, DoubleTap]
+      Anchors = [akLeft, akTop, akRight]
+      TabOrder = 2
+      Position.X = 73.000000000000000000
+      Position.Y = 46.000000000000000000
+      Size.Width = 258.000000000000000000
+      Size.Height = 32.000000000000000000
+      Size.PlatformDefault = False
+    end
+    object Label1: TLabel
+      Position.X = 16.000000000000000000
+      Position.Y = 8.000000000000000000
+      Size.Width = 49.000000000000000000
+      Size.Height = 23.000000000000000000
+      Size.PlatformDefault = False
+      Text = 'Key   :'
+    end
+    object Label2: TLabel
+      Position.X = 16.000000000000000000
+      Position.Y = 48.000000000000000000
+      Size.Width = 65.000000000000000000
+      Size.Height = 23.000000000000000000
+      Size.PlatformDefault = False
+      Text = 'Value:'
+    end
+    object Label3: TLabel
+      Position.X = 16.000000000000000000
+      Position.Y = 90.000000000000000000
+      Size.Width = 57.000000000000000000
+      Size.Height = 23.000000000000000000
+      Size.PlatformDefault = False
+      Text = 'Group:'
+    end
+  end
+  object TabControl1: TTabControl
+    Align = Client
+    FullSize = True
+    Size.Width = 347.000000000000000000
+    Size.Height = 228.000000000000000000
+    Size.PlatformDefault = False
+    TabHeight = 49.000000000000000000
+    TabIndex = 0
+    TabOrder = 12
+    TabPosition = PlatformDefault
+    object TabItem1: TTabItem
+      CustomIcon = <
+        item
+        end>
+      IsSelected = True
+      Size.Width = 174.000000000000000000
+      Size.Height = 49.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 0
+      Text = 'Std Config Text'
+      object MStdConfig: TMemo
+        Touch.InteractiveGestures = [Pan, LongTap, DoubleTap]
+        Align = Client
+        Size.Width = 347.000000000000000000
+        Size.Height = 179.000000000000000000
+        Size.PlatformDefault = False
+        TabOrder = 0
+      end
+    end
+    object TabItem2: TTabItem
+      CustomIcon = <
+        item
+        end>
+      IsSelected = False
+      Size.Width = 173.000000000000000000
+      Size.Height = 49.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 0
+      Text = 'Config Text'
+      object MConfig: TMemo
+        Touch.InteractiveGestures = [Pan, LongTap, DoubleTap]
+        Align = Client
+        Size.Width = 347.000000000000000000
+        Size.Height = 179.000000000000000000
+        Size.PlatformDefault = False
+        TabOrder = 0
+      end
+    end
+  end
+  object Layout3: TLayout
+    Align = Bottom
+    Position.Y = 454.000000000000000000
+    Size.Width = 347.000000000000000000
+    Size.Height = 40.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 13
+    object BClear: TButton
+      Align = Left
+      Size.Width = 169.000000000000000000
+      Size.Height = 40.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 15
+      Text = 'Clear all Configs'
+      OnClick = BClearClick
+    end
+    object BCopyToClipbrd: TButton
+      Align = Left
+      Position.X = 169.000000000000000000
+      Size.Width = 176.000000000000000000
+      Size.Height = 40.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 14
+      Text = 'CopyToClipbrd'
+      OnClick = BCopyToClipbrdClick
+    end
+  end
+end

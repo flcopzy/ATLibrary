@@ -1,5 +1,4 @@
 ## Delphi Auxiliary Toolkit
-
  A set of units for delphi, the purposes is to simplify development, it should supports delphi7 and above(tested in D7, TD, XE2, XE5, XE7, XE10) and the platforms Windows and Android(MacOS and iOS not tested).
 ## Install
  Clone the repository, and add units to your project. 
@@ -8,6 +7,7 @@
 - ATLogger: A lightweight logging for delphi based applications.
 - ATLibraryLoader: makes use dlls becomes simple.
 - ATTimeWatcher:A very lightweight stopwatch.
+
 ## Useage
 Note: These examples are for Windows and the used file paths are hard-coded, so you may make a little changes if the paths not exist or you want to compile to other platforms,  there are some complete examples in the samples folder.
 #### ATConfigurator:

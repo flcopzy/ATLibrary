@@ -3,7 +3,7 @@
 color F2
   
 echo {******************************************************} 
-echo {  This file is part of delphi auxiliary koolkit,      }
+echo {  This file is part of delphi auxiliary toolkit,      }
 echo {  its purpose is to clear all the lib temp files.     }
 echo {******************************************************}  
 echo;

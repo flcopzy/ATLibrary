@@ -334,11 +334,11 @@ type
       var
         LContents, LNewResult: CString;
       begin
-        LContents := '[Group1]'   + sLineBreak +
-                     'City=China' + sLineBreak +
-                     '[Group2]'   + sLineBreak +
-                     'Day=Monday' + sLineBreak +
-                     '[Group3]'   + sLineBreak +
+        LContents := '[Group1]'      + sLineBreak +
+                     'Country=China' + sLineBreak +
+                     '[Group2]'      + sLineBreak +
+                     'Day=Monday'    + sLineBreak +
+                     '[Group3]'      + sLineBreak +
                      'Color=Red';
 
         Configurator := NCIniStr(LContents);

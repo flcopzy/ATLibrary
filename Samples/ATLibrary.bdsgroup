@@ -14,7 +14,8 @@
       <Projects Name="DllLoader.exe">DllLoader\DllLoader.bdsproj</Projects>
       <Projects Name="Dll.dll">DllLoader\Dll.bdsproj</Projects>
       <Projects Name="ConfigViewer.exe">Configurator\ConfigViewer\ConfigViewer.bdsproj</Projects>
-      <Projects Name="Targets">VCLLogger.exe TimeWatcherDemo.exe DllLoader.exe Dll.dll ConfigViewer.exe</Projects>
+      <Projects Name="EnsureOnlyOneAppInst.exe">OnlyOneAppInst\EnsureOnlyOneAppInst.bdsproj</Projects>
+      <Projects Name="Targets">VCLLogger.exe TimeWatcherDemo.exe DllLoader.exe Dll.dll ConfigViewer.exe EnsureOnlyOneAppInst.exe</Projects>
     </Projects>
     <Dependencies/>
   </Default.Personality>

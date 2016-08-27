@@ -595,7 +595,7 @@ begin
 {$ENDIF}
 end;
 
-function GetFileSize(AFileName: string): Int64;
+function GetFileSize(const AFileName: string): Int64;
 var
   LSR: TSearchRec;
 begin
@@ -1277,7 +1277,6 @@ begin
 
     Sleep(50);
 
-  { Wait until FLogList.Count < MAX_ITEMCOUNT. }
   goto WaitFor;
 
 end;

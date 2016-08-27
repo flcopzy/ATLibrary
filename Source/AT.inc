@@ -24,6 +24,10 @@
     {$LEGACYIFEND ON}
   {$IFEND}
 
+  {$IF CompilerVersion >= 31.0}
+    {$DEFINE D10_1BerlinAndUp}
+  {$IFEND}  
+
   {$IF CompilerVersion >= 30.0}
     {$DEFINE D10SeattleAndUp}
   {$IFEND}
@@ -112,4 +116,11 @@
 {$IFDEF NEXTGEN}
   {$ZEROBASEDSTRINGS OFF}
 {$ENDIF}
+
+{$B-} { Turn bool eval off. }
+{$H+} { Use long string. }
+
+{$WARN UNSAFE_TYPE OFF}
+{$WARN UNSAFE_CODE OFF}
+{$WARN UNSAFE_CAST OFF}
 

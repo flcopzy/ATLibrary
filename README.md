@@ -7,6 +7,7 @@
 - ATLogger: A lightweight logging for delphi based applications.
 - ATLibraryLoader: makes use dlls becomes simple.
 - ATTimeWatcher:A very lightweight stopwatch.
+- ATOnlyOneAppInst: Ensure only a single instance of the application runs.
 
 ## Useage
 Note: These examples are for Windows and the used file paths are hard-coded, so you may make a little changes if the paths not exist or you want to compile to other platforms,  there are some complete examples in the samples folder.
@@ -107,3 +108,33 @@ Note: These examples are for Windows and the used file paths are hard-coded, so 
       Sleep(700);
       OutputDebugString(PChar(LTimeWatcher.Elapsed));
     end;
+    
+#### ATOnlyOneAppInst:
+    In dpr file:
+    
+    program EnsureOnlyOneAppInst;
+    
+    uses
+      ...
+      ...;
+      
+    const
+      // You can define your own id.
+      CAppGlobalUniqueID = '{F1FB2123-DD15-44DF-B03B-9D724467AA34}_OnlyOneAppInst';
+      
+    procedure MyOnPreviousAppCall;
+    begin
+      DefaultActiveApp('App is already running.', 'Info', True, Application.MainForm);
+    end;  
+    
+    begin       
+      // NOTE: ATOnlyOneAppInst can only used in Windows.
+      
+      // Check whether the previous app is running.
+      if OnlyOneAppInst(CAppGlobalUniqueID, MyOnPreviousAppCall).IsAppRunning then    
+        Exit;
+        
+      Application.Initialize;
+      Application.CreateForm(TFormOOAIMain, FormOOAIMain);
+      Application.Run;
+    end.   

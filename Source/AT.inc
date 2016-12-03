@@ -1,5 +1,5 @@
 {
-   This file is part of delphi aauxiliary koolkit
+   This file is part of delphi auxiliary koolkit
 
 (* ***** BEGIN LICENSE BLOCK *****
  *
@@ -81,8 +81,12 @@
     {$DEFINE HAS_TEXT_READER_AND_WRITER}
     {$DEFINE HAS_GENERICSCOLLECTIONS}
   {$IFEND}
-
+  
   {$IF CompilerVersion >= 19.0}
+    {$DEFINE D2007DotNetAndUp}
+  {$IFEND}  
+
+  {$IF CompilerVersion >= 18.5}
     {$DEFINE D2007AndUp}
     {$DEFINE HAS_TBYTES}
   {$IFEND}
@@ -99,6 +103,14 @@
     {$DEFINE D2005AndUp}
     {$DEFINE HAS_INLINE}
     {$DEFINE HAS_WIDESTRUTILS}
+  {$IFEND}
+
+  {$IF CompilerVersion >= 16.0}
+    {$DEFINE D8DotNetAndUp}
+  {$IFEND}  
+
+  {$IF CompilerVersion >= 15.0}
+    {$DEFINE D7AndUp}
   {$IFEND}
 
   {$IF Defined(MSWINDOWS) or Defined(MAXOS)}

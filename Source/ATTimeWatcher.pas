@@ -31,7 +31,10 @@
   
   Version 1.001 by ZY:
     (2015.01.20) + First version created.
-    
+
+  Version 1.002 by ZY:
+    (2016.11.29) + Add GetTickCount64 if Windows Vista or later.
+                 + Add ElapsedMsFrom and ElapsedUsFrom.
 *)
 
 (* Useage:
@@ -68,30 +71,25 @@ interface
 
 const
 
-  ATTimeWatcherVersion = '1.001';
+  ATTimeWatcherVersion = '1.002';
 
 type
   TATTimeWatcher = {$IFDEF D2006AndUp}record{$ELSE}object{$ENDIF}
   private
-    FIsInitialized: string;
-    FFrequency: Int64;
     FStartTimeStamp: Int64;
-    FIsHighResolution: Boolean;
-    FTickFrequency: Double;
-    procedure Init;
-    function GetTimeStamp: Int64;
     function GetElapsedTicks: Int64;
-
     function GetElapsedMicroseconds: Extended;
     function GetElapsedMilliseconds: Int64;
     function GetElapsed: string;
   public
     procedure Start;
-    property ElapsedTicks: Int64 read GetElapsedTicks;
+    function ElapsedMsFrom(ATimeStamp: Int64): Int64;
+    function ElapsedUsFrom(ATimeStamp: Int64): Extended;
+    function GetTimeStamp: Int64;
 
+    property ElapsedTicks: Int64 read GetElapsedTicks;
     property ElapsedMicroseconds: Extended read GetElapsedMicroseconds;
     property ElapsedMilliseconds: Int64 read GetElapsedMilliseconds;
-
     { Elapsed milliseconds, retain 3 decimals e.g. 1.234 }
     property Elapsed: string read GetElapsed;
   end;
@@ -106,74 +104,123 @@ uses
   , Classes
 {$ENDIF};
 
+{ Internal global vars, initialized only once. }
 var
   TWFormatSettings: TFormatSettings;
+  IsHighResolution: Boolean;
+  TickFrequency: Double;
 
-{ TATTimeWatcher }
-
-function TATTimeWatcher.GetElapsedMilliseconds: Int64;
-begin
-  Result := Round(ElapsedMicroseconds * 0.001);
-end;
-
-function TATTimeWatcher.GetElapsed: string;
-begin
-  Result := Format('%.3f', [ElapsedMicroseconds * 0.001], TWFormatSettings);
-end;
-
-function TATTimeWatcher.GetElapsedTicks: Int64;
-begin
-  Result := GetTimeStamp - FStartTimeStamp;
-end; 
-
-function TATTimeWatcher.GetElapsedMicroseconds: Extended;
-begin
-  Result := ElapsedTicks * FTickFrequency;
-end;
-
-function TATTimeWatcher.GetTimeStamp: Int64;
-begin
 {$IFDEF MSWINDOWS}
-  if FIsHighResolution then
-    QueryPerformanceCounter(Result)
+var
+  GetTickCount64: function: Int64; stdcall = nil;
+
+procedure GetProcGetTickCount64;
+var
+  LModule: HModule;
+begin
+  LModule := GetModuleHandle(kernel32);
+  if LModule = 0 then
+    RaiseLastOSError;
+  @GetTickCount64 := GetProcAddress(LModule, 'GetTickCount64');
+end;
+
+function WinGetTickCount: Int64;
+begin
+  { Windows Vista or later, try use GetTickCount64. }
+  if Assigned(GetTickCount64) then
+    Result := GetTickCount64
   else
-    { NOTE: Retrieves the number of milliseconds that have
-            elapsed since the system was started, up to 49.7 days. }
+  { NOTE: Retrieves the number of milliseconds that have
+          elapsed since the system was started, up to 49.7 days. }
     Result := GetTickCount;
-{$ELSE}
-  Result := TThread.GetTickCount;
+end;
 {$ENDIF}
-end;
 
-procedure TATTimeWatcher.Init;
+procedure Init;
+var
+  LFrequency: Int64;
 begin
-  if FIsInitialized = '' then
-  begin
-  {$IFDEF MSWINDOWS}
-    FIsHighResolution := QueryPerformanceFrequency(FFrequency);
-  {$ELSE}
-    FIsHighResolution := False;
-  {$ENDIF}
-    if FIsHighResolution then
-      FTickFrequency := 1000000 / FFrequency
-    else
-      FTickFrequency := 1000.0;
-      
-    FIsInitialized := 'Yes';
-  end;
-end;
-
-procedure TATTimeWatcher.Start;
-begin
-  Init;
-  FStartTimeStamp := GetTimeStamp;
-end;
-
-initialization
 {$IFDEF DXEAndUp}
   TWFormatSettings := TFormatSettings.Create;
 {$ELSE}
   GetLocaleFormatSettings(SysLocale.DefaultLCID, TWFormatSettings);
 {$ENDIF}
 
+{$IFDEF MSWINDOWS}
+  GetProcGetTickCount64;
+{$ENDIF}
+
+{$IFDEF MSWINDOWS}
+  IsHighResolution := QueryPerformanceFrequency(LFrequency);
+{$ELSE}
+  IsHighResolution := False;
+{$ENDIF}
+
+  if IsHighResolution then
+    TickFrequency := 1000000 / LFrequency
+  else
+    TickFrequency := 1000.0;
+end;
+
+{ TATTimeWatcher }
+
+function TATTimeWatcher.GetElapsedMilliseconds: Int64;
+begin
+  Result := ElapsedMsFrom(FStartTimeStamp);
+end;
+
+function TATTimeWatcher.ElapsedMsFrom(ATimeStamp: Int64): Int64;
+begin
+  Result := Round(ElapsedUsFrom(ATimeStamp) * 0.001);
+end;
+
+function TATTimeWatcher.ElapsedUsFrom(ATimeStamp: Int64): Extended;
+var
+  LTimeStamp: Int64;
+begin
+  if ATimeStamp >= 0 then
+  begin
+    LTimeStamp := GetTimeStamp;
+    if LTimeStamp >= ATimeStamp then
+      Result := (LTimeStamp - ATimeStamp) * TickFrequency
+    else
+      Result := 0;
+  end else
+    Result := 0;
+end;
+
+function TATTimeWatcher.GetElapsed: string;
+begin
+  Result := FormatFloat('0.000', ElapsedMicroseconds * 0.001, TWFormatSettings);
+end;
+
+function TATTimeWatcher.GetElapsedTicks: Int64;
+begin
+  Result := GetTimeStamp - FStartTimeStamp;
+end;
+
+function TATTimeWatcher.GetElapsedMicroseconds: Extended;
+begin
+  Result := ElapsedUsFrom(FStartTimeStamp);
+end;
+
+function TATTimeWatcher.GetTimeStamp: Int64;
+begin
+{$IFDEF MSWINDOWS}
+  if IsHighResolution then
+    QueryPerformanceCounter(Result)
+  else
+    Result := WinGetTickCount;
+{$ELSE}
+  Result := TThread.GetTickCount;
+{$ENDIF}
+end;
+
+procedure TATTimeWatcher.Start;
+begin
+  FStartTimeStamp := GetTimeStamp;
+end;
+
+initialization
+  Init;
 end.

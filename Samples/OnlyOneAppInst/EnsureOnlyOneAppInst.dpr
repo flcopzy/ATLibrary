@@ -1,11 +1,11 @@
 program EnsureOnlyOneAppInst;
 
 uses
-  ATOnlyOneAppInst,
   Forms,
   SysUtils,
   Windows,
-  frmOOAIMain in 'frmOOAIMain.pas' {FormOOAIMain};
+  frmOOAIMain in 'frmOOAIMain.pas' {FormOOAIMain},
+  ATOnlyOneAppInst in '..\..\Source\ATOnlyOneAppInst.pas';
 
 {$R *.res}
 

@@ -10,7 +10,7 @@ DCC = $(ROOT)\bin\dcc32.exe $**
 BRCC = $(ROOT)\bin\brcc32.exe $**
 #------------------------------------------------------------------------------
 PROJECTS = Dll.dll DllLoader.exe VCLLogger.exe TimeWatcherDemo.exe \
-  ConfigViewer.exe
+  ConfigViewer.exe EnsureOnlyOneAppInst.exe Timer.exe
 #------------------------------------------------------------------------------
 default: $(PROJECTS)
 #------------------------------------------------------------------------------
@@ -28,6 +28,12 @@ TimeWatcherDemo.exe: TimeWatcher\TimeWatcherDemo.dpr
   $(DCC)
 
 VCLLogger.exe: Logger\VCLLogger\VCLLogger.dpr
+  $(DCC)
+
+EnsureOnlyOneAppInst.exe: OnlyOneAppInst\EnsureOnlyOneAppInst.dpr
+  $(DCC)
+
+Timer.exe: Timer\Timer.dpr
   $(DCC)
 
 

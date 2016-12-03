@@ -18,6 +18,12 @@
         <Projects Include="Configurator\ConfigViewer\ConfigViewer.dproj">
             <Dependencies/>
         </Projects>
+        <Projects Include="OnlyOneAppInst\EnsureOnlyOneAppInst.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="Timer\Timer.dproj">
+            <Dependencies/>
+        </Projects>
     </ItemGroup>
     <ProjectExtensions>
         <Borland.Personality>Default.Personality.12</Borland.Personality>
@@ -71,14 +77,32 @@
     <Target Name="ConfigViewer:Make">
         <MSBuild Projects="Configurator\ConfigViewer\ConfigViewer.dproj" Targets="Make"/>
     </Target>
+    <Target Name="EnsureOnlyOneAppInst">
+        <MSBuild Projects="OnlyOneAppInst\EnsureOnlyOneAppInst.dproj"/>
+    </Target>
+    <Target Name="EnsureOnlyOneAppInst:Clean">
+        <MSBuild Projects="OnlyOneAppInst\EnsureOnlyOneAppInst.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="EnsureOnlyOneAppInst:Make">
+        <MSBuild Projects="OnlyOneAppInst\EnsureOnlyOneAppInst.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="Timer">
+        <MSBuild Projects="Timer\Timer.dproj"/>
+    </Target>
+    <Target Name="Timer:Clean">
+        <MSBuild Projects="Timer\Timer.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="Timer:Make">
+        <MSBuild Projects="Timer\Timer.dproj" Targets="Make"/>
+    </Target>
     <Target Name="Build">
-        <CallTarget Targets="DllLoader;Dll;VCLLogger;TimeWatcherDemo;ConfigViewer"/>
+        <CallTarget Targets="DllLoader;Dll;VCLLogger;TimeWatcherDemo;ConfigViewer;EnsureOnlyOneAppInst;Timer"/>
     </Target>
     <Target Name="Clean">
-        <CallTarget Targets="DllLoader:Clean;Dll:Clean;VCLLogger:Clean;TimeWatcherDemo:Clean;ConfigViewer:Clean"/>
+        <CallTarget Targets="DllLoader:Clean;Dll:Clean;VCLLogger:Clean;TimeWatcherDemo:Clean;ConfigViewer:Clean;EnsureOnlyOneAppInst:Clean;Timer:Clean"/>
     </Target>
     <Target Name="Make">
-        <CallTarget Targets="DllLoader:Make;Dll:Make;VCLLogger:Make;TimeWatcherDemo:Make;ConfigViewer:Make"/>
+        <CallTarget Targets="DllLoader:Make;Dll:Make;VCLLogger:Make;TimeWatcherDemo:Make;ConfigViewer:Make;EnsureOnlyOneAppInst:Make;Timer:Make"/>
     </Target>
     <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
 </Project>

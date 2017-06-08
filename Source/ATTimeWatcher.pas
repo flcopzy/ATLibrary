@@ -140,6 +140,8 @@ procedure Init;
 var
   LFrequency: Int64;
 begin
+  LFrequency := 1;
+  
 {$IFDEF DXEAndUp}
   TWFormatSettings := TFormatSettings.Create;
 {$ELSE}

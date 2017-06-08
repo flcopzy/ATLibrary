@@ -8,9 +8,7 @@
 			<Option Name="GUID">{680A9915-32F7-4B81-9514-F3014FC0CEE1}</Option>
 		</Option>
 	</PersonalityInfo>
-	<Default.Personality>  
-    
-    <Projects>
+	<Default.Personality>  <Projects>
       <Projects Name="VCLLogger.exe">Logger\VCLLogger\VCLLogger.bdsproj</Projects>
       <Projects Name="TimeWatcherDemo.exe">TimeWatcher\TimeWatcherDemo.bdsproj</Projects>
       <Projects Name="DllLoader.exe">DllLoader\DllLoader.bdsproj</Projects>

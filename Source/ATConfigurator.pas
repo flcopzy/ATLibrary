@@ -61,6 +61,11 @@
     (2015.11.01) + Some wide version methods and classes added,
                    it used for earlier delphi which need use the
                    unicode.
+
+  Version 1.006 by ZY:
+    (2017.03.27) + Add CopyGroup to IATConfigurator.
+                 * fix a bug in TATDBStorageProvider that does not
+                   clear the return strings when read an empty section.
 *)
 
 unit ATConfigurator;
@@ -141,7 +146,7 @@ uses
 {$ENDIF};
 
 const
-  ATConfiguratorVersion = '1.005';
+  ATConfiguratorVersion = '1.006';
 
 type
 
@@ -209,6 +214,7 @@ type
     procedure GetConfigGroupValues(const AGroup: CString; AStrings: TCStrings);
     procedure ConfigsIterator(AConfigsIterator: TATConfigsIterator);
     function ConfigGroupExists(const AGroup: CString): Boolean;
+    function CopyGroup(const ASrcGroup: CString; const ADestGroup: CString; const ADestConfigurator: IATConfigurator = nil): Boolean;
 
     { Deletion Operations }
     procedure DeleteConfig(const AKey: CString; const AGroup: CString = '');
@@ -2632,29 +2638,31 @@ var
   LFieldKey: TField;
   LFieldValue: TField;
 begin
-  with {$IFDEF USE_ADO}TADOQuery{$ELSE}TFDQuery{$ENDIF}(FDataSet) do
-  begin
-    SQL.Text := FSqlSupporter.GetSqlQueryGroupValues(Section);
-    Open;
+  Strings.BeginUpdate;
+  try
+    Strings.Clear;
 
-    if IsEmpty then
-      Exit;
+    with {$IFDEF USE_ADO}TADOQuery{$ELSE}TFDQuery{$ENDIF}(FDataSet) do
+    begin
+      SQL.Text := FSqlSupporter.GetSqlQueryGroupValues(Section);
+      Open;
 
-    LFieldKey   := FieldByName(FFieldKeyName);
-    LFieldValue := FieldByName(FFieldValueName);
+      if IsEmpty then
+        Exit;
 
-    Strings.BeginUpdate;
-    try
-      Strings.Clear;
+      LFieldKey   := FieldByName(FFieldKeyName);
+      LFieldValue := FieldByName(FFieldValueName);
+
       while not Eof do
       begin
         Strings.Add(MakeKeyValueStr(GetFieldValue(LFieldKey), Strings.NameValueSeparator,
           GetFieldValue(LFieldValue)));
         Next;
       end;
-    finally
-      Strings.EndUpdate;
     end;
+
+  finally
+    Strings.EndUpdate;
   end;
 end;
 
@@ -2924,7 +2932,8 @@ type
     procedure GetConfigGroupValues(const AGroup: CString; AStrings: TCStrings);
     procedure ConfigsIterator(AConfigsIterator: TATConfigsIterator);
     function ConfigGroupExists(const AGroup: CString): Boolean;
-
+    function CopyGroup(const ASrcGroup: CString; const ADestGroup: CString; const ADestConfigurator: IATConfigurator = nil): Boolean;
+    
     procedure DeleteConfig(const AKey: CString; const AGroup: CString = '');
     procedure DeleteGroup(const AGroup: CString);
     procedure ClearAllConfigs;
@@ -3245,6 +3254,45 @@ begin
   LConfigurator := NCIniStr(LStreamText);
   Self.ClearAllConfigs;
   LConfigurator.CopyTo(Self);
+end;
+
+function TATConfigurator.CopyGroup(const ASrcGroup, ADestGroup: CString;
+  const ADestConfigurator: IATConfigurator): Boolean;
+var
+  I: Integer;
+  LSrcGroup,
+  LDestGroup: CString;
+  LGroupValues: TCStringList;
+  LDestCfg: IATConfigurator;
+begin
+  Result := False;
+
+  LSrcGroup  := Trim(ASrcGroup);
+  LDestGroup := Trim(ADestGroup);
+  
+  if (LSrcGroup = '') or (ADestGroup = '') then
+    Exit;
+
+  if Assigned(ADestConfigurator) then
+    LDestCfg := ADestConfigurator
+  else
+    LDestCfg := Self;
+
+  if LDestCfg = (Self as IATConfigurator) then
+    if CSameText(LSrcGroup, LDestGroup) then
+      Exit;
+
+  LGroupValues := TCStringList.Create;
+  try
+    GetConfigGroupValues(ASrcGroup, LGroupValues);
+
+    for I := 0 to LGroupValues.Count - 1 do
+      LDestCfg.SetConfig(LGroupValues.Names[I], LGroupValues.ValueFromIndex[I], ADestGroup);
+
+    Result := LGroupValues.Count > 0;  
+  finally
+    LGroupValues.Free;
+  end;
 end;
 
 function TATConfigurator.CopyTo(const ADest: IATConfigurator): Boolean;

@@ -355,10 +355,6 @@ object FrmConfigViewer: TFrmConfigViewer
         object TSStdText: TTabSheet
           Caption = 'Std Config View'
           ImageIndex = 1
-          ExplicitLeft = 0
-          ExplicitTop = 0
-          ExplicitWidth = 0
-          ExplicitHeight = 0
           object MStd: TMemo
             Left = 0
             Top = 0
@@ -375,10 +371,6 @@ object FrmConfigViewer: TFrmConfigViewer
         object TabSheet1: TTabSheet
           Caption = 'Config Text View'
           ImageIndex = 2
-          ExplicitLeft = 0
-          ExplicitTop = 0
-          ExplicitWidth = 0
-          ExplicitHeight = 0
           object MConfig: TMemo
             Left = 0
             Top = 0

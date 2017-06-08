@@ -24,9 +24,13 @@
     {$LEGACYIFEND ON}
   {$IFEND}
 
+  {$IF CompilerVersion >= 32.0}
+    {$DEFINE D10_2TokyoAndUp}
+  {$IFEND}
+
   {$IF CompilerVersion >= 31.0}
     {$DEFINE D10_1BerlinAndUp}
-  {$IFEND}  
+  {$IFEND}
 
   {$IF CompilerVersion >= 30.0}
     {$DEFINE D10SeattleAndUp}

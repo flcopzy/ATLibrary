@@ -2610,25 +2610,26 @@ procedure TATDBStorageProvider.ReadSections(Strings: TCStrings);
 var
   LFieldGroup: TField;
 begin
-  with {$IFDEF USE_ADO}TADOQuery{$ELSE}TFDQuery{$ENDIF}(FDataSet) do
-  begin
-    SQL.Text := FSqlSupporter.GetSqlQueryGroups;
-    Open;
-    if IsEmpty then
-      Exit;
+  Strings.BeginUpdate;
+  try
+    Strings.Clear;
 
-    LFieldGroup := FieldByName(FFieldGroupName);
-    Strings.BeginUpdate;
-    try
-      Strings.Clear;
+    with {$IFDEF USE_ADO}TADOQuery{$ELSE}TFDQuery{$ENDIF}(FDataSet) do
+    begin
+      SQL.Text := FSqlSupporter.GetSqlQueryGroups;
+      Open;
+      if IsEmpty then
+        Exit;
+
+      LFieldGroup := FieldByName(FFieldGroupName);
       while not Eof do
       begin
         Strings.Add(GetFieldValue(LFieldGroup));
         Next;
       end;
-    finally
-      Strings.EndUpdate;
     end;
+  finally
+    Strings.EndUpdate;
   end;
 end;
 

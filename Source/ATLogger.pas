@@ -55,7 +55,8 @@
 
   Version 1.005 by ZY:
     (2015.09.01) + Added OS info to the file logger header.
-                 + Fixed the cleaner that cannt clear the empty root dir.
+                 * Fixed the cleaner that cannt clear the empty root dir.
+    (2017.06.10) * A conditional compilation not matched fixed.
 
 *)
 
@@ -1307,7 +1308,7 @@ begin
     end;
   end;
 end;
-{$ENDIF)
+{$ENDIF}
 
 { TATDefaultLogOutputter }
 

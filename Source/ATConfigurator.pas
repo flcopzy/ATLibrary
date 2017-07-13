@@ -112,7 +112,10 @@ interface
 {$ENDIF DB_SUPPORTED}
 
 {$IFDEF JSON_SUPPORTED}
-  {$IFDEF HAS_DBXJSON}
+  {$IFDEF DXE2AndUp}
+    { NOTE: DBXJSON was introduced since Delphi2010, but we decide
+            use it after delphi XE2 as it has less functions in
+            earlier versions. }
     {$DEFINE USE_DBXJSON}
   {$ELSE}
     {$DEFINE USE_SUPEROBJECT}
@@ -537,7 +540,8 @@ uses
     {$IFDEF HAS_SYSTEMJSON}
    , System.JSON
     {$ELSE}
-   , Data.DBXJSON, Data.DBXPlatform
+   ,  {$IFDEF HAS_UNIT_SCOPE}Data.DBXJSON{$ELSE}DBXJSON{$ENDIF},
+      {$IFDEF HAS_UNIT_SCOPE}Data.DBXPlatform{$ELSE}DBXPlatform{$ENDIF}
     {$ENDIF}
   {$ENDIF}
   {$IFDEF USE_SUPEROBJECT}
@@ -559,7 +563,7 @@ uses
   {$IFDEF HAS_UNIT_SCOPE}, Vcl.Forms{$ELSE}, Forms{$ENDIF}
 {$ENDIF}
 {$IFDEF HAS_IOUTILS}
-  , System.IOUtils
+  , {$IFDEF HAS_UNIT_SCOPE}System.IOUtils{$ELSE}IOUtils{$ENDIF}
 {$ENDIF}
 
 {$IFDEF ANDROID}

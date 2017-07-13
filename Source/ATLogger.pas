@@ -89,7 +89,7 @@ uses
   , System.Generics.Collections
 {$ENDIF}
 {$IFDEF HAS_IOUTILS}
-  , System.IOUtils
+  , {$IFDEF HAS_UNIT_SCOPE}System.IOUtils{$ELSE}IOUtils{$ENDIF}
 {$ENDIF}
 {$IFDEF ANDROID}
   , Androidapi.Log
@@ -615,7 +615,7 @@ end;
 procedure DelDirectory(const ADir: string);
 begin
 {$IFDEF HAS_IOUTILS}
-  System.IOUtils.TDirectory.Delete(ADir);
+  TDirectory.Delete(ADir);
 {$ELSE}
   RemoveDir(ADir);
 {$ENDIF}
@@ -624,7 +624,7 @@ end;
 procedure DelFile(const AFileName: string);
 begin
 {$IFDEF HAS_IOUTILS}
-  System.IOUtils.TFile.Delete(AFileName);
+  TFile.Delete(AFileName);
 {$ELSE}
   DeleteFile(AFileName);
 {$ENDIF}

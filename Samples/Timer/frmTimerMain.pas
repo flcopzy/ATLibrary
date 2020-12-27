@@ -72,7 +72,7 @@ end;
 procedure TFormTimerMain.CheckBox1Click(Sender: TObject);
 begin
   SpinEditInterval.Enabled := not TCheckBox(Sender).Checked;
- 
+
   if TCheckBox(Sender).Checked then
   begin
     SysTimer.Interval := SpinEditInterval.Value;

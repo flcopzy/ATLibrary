@@ -42,23 +42,28 @@ begin
 
   Memo1.Lines.Add('test start...' + sLineBreak);
 
+  // Start
+  Memo1.Lines.Add(Format('will sleep %d ms ...', [LTime]));
   LTW.Start;
   Sleep(LTime);
   Memo1.Lines.Add(Format('elapsed: %s ms', [LTW.Elapsed]));
 
   // Continue
+  Memo1.Lines.Add(Format('sleep %d ms again', [LTime]));
   Sleep(LTime);
-  Memo1.Lines.Add(Format('elapsed: %u ms', [LTW.ElapsedMilliseconds]));
+  Memo1.Lines.Add(Format('elapsed: %d ms', [LTW.ElapsedMilliseconds]));
 
+  Memo1.Lines.Add('');
   Memo1.Lines.Add('restart...');
 
   // Restart
+  Memo1.Lines.Add(Format('will sleep %d ms ...', [LTime]));
   LTW.Start;
   Sleep(LTime);
   Memo1.Lines.Add(Format('elapsed: %.2f us', [LTW.ElapsedMicroseconds]));
 
   // Test timestamp
-  Memo1.Lines.Add(sLineBreak + 'timestamp test start...' + sLineBreak);
+  Memo1.Lines.Add(sLineBreak + 'timestamp test start...');
 
   LTimeStamp := LTW.GetTimeStamp;
   Sleep(LTime);

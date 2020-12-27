@@ -1933,7 +1933,6 @@ var
   LJP: TJSONPair;
   LJA: TJSONArray;
 begin
-
   { Group not exists }
   if not Assigned(FJSONObject.Get(Section)) then
     FJSONObject.AddPair(Section, TJSONArray.Create(CreateNewObject))
@@ -1943,7 +1942,7 @@ begin
     { Item exists }
     if Assigned(LJP) then
     begin
-      LJP.JsonValue{$IFNDEF AUTOREFCOUNT}.Free{$ELSE}.DisposeOf{$ENDIF};
+      { Create new one }
       LJP.JsonValue := TJSONString.Create(Value);
     end else
     { Item not exists }

@@ -1026,7 +1026,7 @@ type
   TAsyncLogThread = class(TATCustomLogThread)
   private
     FLastLogErrorMsg: string;
-    {$IFDEF AUTOREFCOUNT}[Weak]{$ENDIF} FOwner: TATAsyncLogOutputter;
+    {$IFDEF AUTOREFCOUNT}[unsafe]{$ENDIF} FOwner: TATAsyncLogOutputter;
     FAsyncOutputEvent: TAsyncOutputEvent;
     procedure SetLogErrorMsg(const AException: Exception); {$IFDEF HAS_INLINE}inline;{$ENDIF}
     procedure ThreadSwitch(const AItemCount: Integer); {$IFDEF HAS_INLINE}inline;{$ENDIF}

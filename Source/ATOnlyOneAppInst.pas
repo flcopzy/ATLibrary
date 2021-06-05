@@ -32,6 +32,10 @@
   Version 1.001 by ZY:
     (2016.05.10) + First version created.
 
+  Version 1.002 by ZY:
+    (2021.06.01) + Support application cmd line param.
+                 - remove all functions that related to VCL, as
+                   we need support fmx.
 *) 
 
 unit ATOnlyOneAppInst;
@@ -40,216 +44,409 @@ unit ATOnlyOneAppInst;
 
 interface
 
-{$IFDEF MSWINDOWS}
-
-uses
-  Forms;
+{$IFNDEF MSWINDOWS}
+  {$MESSAGE ERROR 'ATOnlyOneAppInst currently only supported in MS WINDOWS.'}
+{$ENDIF}
 
 const
 
-  ATOnlyOneAppInstVersion = '1.001';  
+  ATOnlyOneAppInstVersion = '1.002';
 
 type
 
-{$IFDEF HAS_ANONYMOUSMETHOD}
-  TATAppCallback = reference to procedure;
-{$ELSE}
-  TATAppCallback = procedure;
-{$ENDIF}
+  /// <summary> Application callback event. </summary>
+  /// <param name="ANextPID"> The PID of the next app, zero if no param passed. </param>
+  /// <param name="ANextParam"> The param of the next app, empty if no param passed. </param>
+  TATAppCallback = {$IFDEF HAS_ANONYMOUSMETHOD}reference to{$ENDIF}
+                   procedure(ANextPID: UInt64; const ANextParam: string);
 
+  /// <summary> The only one application instance interface. </summary>
   IATOnlyOneAppInst = interface
     ['{B1FBB24B-F793-48E3-88C2-D9C4E2B7262A}']
+    /// <summary> Check if an application is already running. </summary>
     function IsAppRunning: Boolean;
   end;
 
+/// <summary> Get the only one application instance interface. </summary>
+/// <param name="AAppGlobalUniqueID"> App global unique id, if empty then a default id will be used. </param>
+/// <param name="AOnNextAppCall"> App callback event. </param>
+/// <returns> Return an interface(IATOnlyOneAppInst) </returns>
+///
+/// <remarks> NOTE 1. AppGlobalUniqueID is a global unique id, it is best to use
+///                   a guid combination string and should not already used by
+///                   other objects, like Event, Mutex etc.
+///
+///                2. Usually it only needs to be used once in dpr file, and do
+///                   not used in thread, it is meaningless.
+///
+///                3. On MSWindows, it's not supported if your application
+///                   is not a GUI application(required message loop).
+///
+///                4. if param is not empty, the app callback event should not
+///                   do heavy work, because the next application will wait
+///                   for a while until it times out.
+///
+/// </remarks>
 function OnlyOneAppInst(const AAppGlobalUniqueID: string = '';
-  AOnPreviousAppCall: TATAppCallback = nil): IATOnlyOneAppInst;
-
-procedure DefaultActiveApp(const ATips: string = ''; const ACaption: string = '';
-  ANeedRestoreApp: Boolean = True; AFormNeededBringToTop: TCustomForm = nil);
-procedure DefaultOnPreviousAppCall;
-
-{$ELSE}
-  {$MESSAGE ERROR 'ATOnlyOneAppInst currently only supported in MS WINDOWS.'}
-{$ENDIF MSWINDOWS}
+  AOnNextAppCall: TATAppCallback = nil): IATOnlyOneAppInst;
 
 implementation
-
-{$IFDEF MSWINDOWS}
 
 uses
   Windows, Messages, SysUtils, Classes;
 
 resourcestring
-  sCreateMutexError           = '[%s] Create mutex ''%s'' failed, error msg: %s.';
-  sRegisterWindowMessageError = '[%s] Register window message ''%s'' failed, error msg: %s.';
-  sAppAlreadyRunning          = '''%s'' is already running.';
+  sCreateMutexError           = 'Create mutex ''%s'' failed, error msg: %s.';
+  sCreateHWndError            = 'Create HWnd failed, error msg: %s.';
+  sRegisterWindowMessageError = 'Register window message ''%s'' failed, error msg: %s.';
+  sCreateMemFileMappingFailed = 'Create mem file mapping ''%s'' failed, error msg: %s.';
+  sOpenMemFileMappingFailed   = 'Open mem file mapping ''%s'' failed, error msg: %s.';
+  sAccessMemDataFailed        = 'Access mem data failed, error msg: %s.';
 
-procedure DefaultActiveApp(const ATips: string; const ACaption: string;
-  ANeedRestoreApp: Boolean; AFormNeededBringToTop: TCustomForm);
+//{$DEFINE Debug_ATOnlyOneAppInst}
 
-  procedure ShowTips;
-  var
-    LCaption: string;
-  begin
-    if Trim(ATips) <> '' then
-    begin
-      LCaption := ACaption;
-      if Trim(LCaption) = '' then
-        LCaption := Application.Title;
-
-      MessageBox(0, PChar(ATips), PChar(LCaption), MB_OK + MB_ICONINFORMATION + MB_TOPMOST);
-    end;
-  end;
-
-  function TryBringWindowToTop(AWindow: HWND): Boolean;
-  var
-    LInput: TInput;
-  begin
-    FillChar(LInput, SizeOf(LInput), 0);
-    SendInput(1, LInput, SizeOf(LInput));
-    Result := SetForegroundWindow(AWindow);
-  end;
-
-  procedure ActiveForm;
-  begin
-    if Assigned(AFormNeededBringToTop) then
-    begin
-      TForm(AFormNeededBringToTop).Visible := True;
-
-      if AFormNeededBringToTop.WindowState = wsMinimized then
-        AFormNeededBringToTop.WindowState := wsNormal;
-
-      TryBringWindowToTop(AFormNeededBringToTop.Handle);
-    end;
-  end;
-
+procedure DebugOutput(const AMsg: string); overload;
 begin
-  ShowTips;
-
-  if ANeedRestoreApp then
-    Application.Restore;
-
-  ActiveForm;
+{$IFDEF Debug_ATOnlyOneAppInst}
+  OutputDebugString(PChar(Format('[PID=%u] ', [GetCurrentProcessId]) + AMsg));
+{$ENDIF}
 end;
 
-function GetPureAppName: string;
+procedure DebugOutput(const AMsg: string; const AArgs: array of const); overload;
 begin
-  Result := ChangeFileExt(ExtractFileName(ParamStr(0)), '');
+  DebugOutput(Format(AMsg, AArgs));
 end;
 
-procedure DefaultOnPreviousAppCall;
+function GetGlobalMemFileMappingName(APID: DWORD): string;
 begin
-  DefaultActiveApp(Format(sAppAlreadyRunning, [GetPureAppName]), '', True,
-    Application.MainForm);
+  Result := Format('{2B24DFE7-E726-4E10-A45D-2A11D2839495}_ATOnlyOneAppInst_MMN_%u', [APID]);
+end;
+
+function GenerateDefaultGlobalUniqueID: string;
+
+  function GetPureAppName: string;
+  begin
+    Result := ChangeFileExt(ExtractFileName(ParamStr(0)), '');
+  end;
+
+begin
+  Result := Format('{1130D592-9727-417F-BB65-5C38FEA63B96}_ATOnlyOneAppInst_Def_%s', [GetPureAppName]);
 end;
 
 type
-  TATOnlyOneAppInst = class(TInterfacedObject, IATOnlyOneAppInst)
+
+{$IFNDEF HAS_TBYTES}
+  TBytes = array of Byte;
+{$ENDIF}
+
+  TATCustomOnlyOneAppInst = class(TInterfacedObject, IATOnlyOneAppInst)
+  private
+    FIsAppRunning: Boolean;
+    FAppGlobalUniqueID: string;
+    FOnAppCallback: TATAppCallback;
+  protected
+    function GetPureParam: string; virtual;
+    function StrToBytes(const AStr: string): TBytes; virtual; abstract;
+    function BytesToStr(AStrBytes: TBytes): string; virtual; abstract;
+    { IATOnlyOneAppInst }
+    function IsAppRunning: Boolean; virtual; abstract;
+  public
+    constructor Create(const AAppGlobalUniqueID: string; AOnAppCallback: TATAppCallback); virtual;
+  end;
+
+  TATWinOnlyOneAppInst = class(TATCustomOnlyOneAppInst)
   private
     FAppMutex: THandle;
-    FMsgHandle: HWND;
-    FGlobalMsg: UINT;
-    FIsAppRunning: Boolean;
-    FOnAppCallback: TATAppCallback;
-    procedure WndProc(var AMsg: TMessage); 
+    FAppMsgHandle: HWND;
+    FAppMsgID: UINT;
+    procedure InternalWndProc(var AMsg: TMessage);
+    procedure DoAppCallback(ANextPID: DWORD; const ANextParam: string);
+    procedure ProcessAppCallback(APID: DWORD; AParamSize: Integer);
+  protected
+    function StrToBytes(const AStr: string): TBytes; override;
+    function BytesToStr(AStrBytes: TBytes): string; override;
+    function IsAppRunning: Boolean; override;
   public
-    constructor Create(AAppGlobalUniqueID: string; AOnAppCallback: TATAppCallback);
+    constructor Create(const AAppGlobalUniqueID: string; AOnAppCallback: TATAppCallback); override;
     destructor Destroy; override;
-    { IATOnlyOneAppInst }
-    function IsAppRunning: Boolean;
   end;
+
+{ TATCustomOnlyOneAppInst }
+
+constructor TATCustomOnlyOneAppInst.Create(const AAppGlobalUniqueID: string; AOnAppCallback: TATAppCallback);
+begin
+  inherited Create;
+  FAppGlobalUniqueID := AAppGlobalUniqueID;
+  FOnAppCallback := AOnAppCallback;
+end;
+
+function TATCustomOnlyOneAppInst.GetPureParam: string;
+var
+  I: Integer;
+begin
+  Result := '';
+  for I := 1 to ParamCount do
+    Result := Result + ParamStr(I) + ' ';
+  Result := Trim(Result);
+end;
 
 { TATOnlyOneAppInst }
 
-constructor TATOnlyOneAppInst.Create(AAppGlobalUniqueID: string;
-  AOnAppCallback: TATAppCallback);
+function TATWinOnlyOneAppInst.BytesToStr(AStrBytes: TBytes): string;
+var
+  LWideStr: {$IFDEF UNICODE}string{$ELSE}WideString{$ENDIF};
+begin
+  if Length(AStrBytes) > 0 then
+    SetString(LWideStr, PWideChar(@AStrBytes[Low(AStrBytes)]),
+      Length(AStrBytes) div (SizeOf(LWideStr[1])))
+  else
+    LWideStr := '';
+  Result := LWideStr;
+end;
 
-  function GenerateDefaultGlobalUniqueID: string;
-  begin
-    Result := Format('{1130D592-9727-417F-BB65-5C38FEA63B96}_$%s$', [GetPureAppName]);
-  end;
-    
+constructor TATWinOnlyOneAppInst.Create(const AAppGlobalUniqueID: string;
+  AOnAppCallback: TATAppCallback);
 var
   LErrorCode: DWORD;
 begin
-  inherited Create;
+  inherited;
 
-  if Trim(AAppGlobalUniqueID) = '' then
-    AAppGlobalUniqueID := GenerateDefaultGlobalUniqueID;
+  { If the input global uniqueID is empty, create a default one. }
+  if Trim(FAppGlobalUniqueID) = '' then
+    FAppGlobalUniqueID := GenerateDefaultGlobalUniqueID;
 
-  { Use mutex for multi app instances checking. }
-  FAppMutex := CreateMutex(nil, False, PChar(AAppGlobalUniqueID));
+  { Create mutex for multi app instances checking. }
+  FAppMutex := CreateMutex(nil, False, PChar(FAppGlobalUniqueID));
   LErrorCode := GetLastError;
   if FAppMutex = 0 then
     raise Exception.CreateResFmt(@sCreateMutexError,
-      [ClassName, AAppGlobalUniqueID, SysErrorMessage(LErrorCode)]);
+      [FAppGlobalUniqueID, SysErrorMessage(LErrorCode)]);
+
+  DebugOutput('Mutex %u, name ''%s'' create successful. ', [FAppMutex, FAppGlobalUniqueID]);
 
   FIsAppRunning := (LErrorCode = ERROR_ALREADY_EXISTS);
 
+  DebugOutput('App is running = %s.', [BoolToStr(FIsAppRunning, True)]);
+
   { Register a global msg id for broadcasting. }
-  FGlobalMsg := RegisterWindowMessage(PChar(AAppGlobalUniqueID));
+  FAppMsgID := RegisterWindowMessage(PChar(FAppGlobalUniqueID));
   LErrorCode := GetLastError;
-  if FGlobalMsg = 0 then
+  if FAppMsgID = 0 then
     raise Exception.CreateResFmt(@sRegisterWindowMessageError,
-      [ClassName, AAppGlobalUniqueID, SysErrorMessage(LErrorCode)]);
+      [FAppGlobalUniqueID, SysErrorMessage(LErrorCode)]);
+
+  DebugOutput('RegisterWindowMessage ''%s'' successful.', [FAppGlobalUniqueID]);
 
   { Callback event and msg monitor only used in the previous app. }
   if not FIsAppRunning then
   begin
-    FOnAppCallback := AOnAppCallback;
-    FMsgHandle := AllocateHWnd(WndProc);
+    FAppMsgHandle := AllocateHWnd(InternalWndProc);
+    if FAppMsgHandle = 0 then
+      raise Exception.CreateResFmt(@sCreateHWndError, [SysErrorMessage(LErrorCode)]);
+    DebugOutput('AllocateHWnd %u successful.', [FAppMsgHandle]);
   end;
 end;
 
-destructor TATOnlyOneAppInst.Destroy;
+destructor TATWinOnlyOneAppInst.Destroy;
 begin
-  if FMsgHandle <> 0 then
+  if FAppMsgHandle <> 0 then
   begin
-    DeallocateHWnd(FMsgHandle);
-    FMsgHandle := 0;
+    DeallocateHWnd(FAppMsgHandle);
+    DebugOutput('DeallocateHWnd %u successful.', [FAppMsgHandle]);
+    FAppMsgHandle := 0;
   end;
 
   if FAppMutex <> 0 then
   begin
     CloseHandle(FAppMutex);
+    DebugOutput('Mutex %u Closed successful.', [FAppMutex]);
     FAppMutex := 0;
   end;
   inherited;
 end;
 
-procedure TATOnlyOneAppInst.WndProc(var AMsg: TMessage);
+procedure TATWinOnlyOneAppInst.DoAppCallback(ANextPID: DWORD; const ANextParam: string);
 begin
-  if (AMsg.Msg = FGlobalMsg) and Assigned(FOnAppCallback) then
-  begin
-    try
-      FOnAppCallback();
-    except
-      Application.HandleException(Self);
-    end;
-  end else
-    AMsg.Result := DefWindowProc(FMsgHandle, AMsg.Msg, AMsg.WParam, AMsg.LParam);
+  if Assigned(FOnAppCallback) then
+    FOnAppCallback(ANextPID, ANextParam);
 end;
 
-function TATOnlyOneAppInst.IsAppRunning: Boolean;
+procedure TATWinOnlyOneAppInst.InternalWndProc(var AMsg: TMessage);
+begin
+  if AMsg.Msg = FAppMsgID then
+  begin
+    try
+      ProcessAppCallback(DWORD(AMsg.WParam), Integer(AMsg.LParam));
+    except
+      on E: Exception do
+        MessageBox(0, PChar(E.Message), nil, MB_OK + MB_ICONERROR + MB_TOPMOST);
+    end;
+  end else
+    AMsg.Result := DefWindowProc(FAppMsgHandle, AMsg.Msg, AMsg.WParam, AMsg.LParam);
+end;
+
+function TATWinOnlyOneAppInst.IsAppRunning: Boolean;
 const
   CRecipients: DWORD = BSM_APPLICATIONS;
+var
+  LCurrentProcessId, LErrorCode: DWORD;
+  LMemFileMappingHandle: THandle;
+  LMemFileMappingName, LParamStr: string;
+  LParamBytes: TBytes;
+  LParamBytesSize: Integer;
+  LMapViewOfFile: Pointer;
+  LSendMsgResult: LRESULT;
+  LBroadcastSystemMessageResult: LongInt;
+{$IFNDEF DXE2AndUp}
+  lpdwResult: DWORD;
+{$ENDIF}
 begin
   Result := FIsAppRunning;
 
-  if Result then
-  { Post the registered msg to applications(except current app),
-    so the previous app will has a change to receive the msg. }
-    BroadcastSystemMessage(BSF_IGNORECURRENTTASK or BSF_POSTMESSAGE, @CRecipients,
-      FGlobalMsg, 0, 0);
+  { No previous app exists, do nothing. }
+  if not Result then
+    Exit;
+
+  if ParamCount = 0 then
+  begin
+    DebugOutput('No Param found.');
+
+    { Param is empty, post the registered msg to applications(except current app),
+      the previous app will has a notification. }
+    LBroadcastSystemMessageResult := BroadcastSystemMessage(
+      BSF_IGNORECURRENTTASK or BSF_POSTMESSAGE, @CRecipients, FAppMsgID, 0, 0);
+
+    if LBroadcastSystemMessageResult <> -1 then
+      DebugOutput('BroadcastSystemMessage successful.')
+    else
+      DebugOutput('BroadcastSystemMessage failed, error: ''%s''.', [SysErrorMessage(GetLastError)]);
+  end else
+  begin
+    { Param is not empty, it seems that BroadcastSystemMessage not
+      support sync call, so we need do sync send message. }
+
+    LCurrentProcessId := GetCurrentProcessId;
+    LMemFileMappingName := GetGlobalMemFileMappingName(LCurrentProcessId);
+
+    { Get param and convert to bytes. }
+    LParamStr := GetPureParam;
+    LParamBytes := StrToBytes(LParamStr);
+    LParamBytesSize := Length(LParamBytes);
+    Assert(LParamBytesSize <> 0);
+
+    DebugOutput('Param found ''%s''. ', [LParamStr]);
+
+    { Create mem file mapping. }
+    LMemFileMappingHandle := CreateFileMapping(INVALID_HANDLE_VALUE, nil,
+      PAGE_READWRITE, 0, LParamBytesSize, PChar(LMemFileMappingName));
+    LErrorCode := GetLastError;
+    if LMemFileMappingHandle = 0 then
+      raise Exception.CreateResFmt(@sCreateMemFileMappingFailed,
+        [LMemFileMappingName, SysErrorMessage(LErrorCode)]);
+
+    DebugOutput('CreateFileMapping ''%s'', size %u successful. ', [LMemFileMappingName, LParamBytesSize]);
+
+    try
+      { Maybe we're the third app and the second app is still waiting,
+        we should exit immediately. }
+      if LErrorCode = ERROR_ALREADY_EXISTS then
+        Exit;
+
+      { Try access the mem. }
+      LMapViewOfFile := MapViewOfFile(LMemFileMappingHandle, FILE_MAP_WRITE, 0, 0, 0);
+      if LMapViewOfFile = nil then
+        raise Exception.CreateResFmt(@sAccessMemDataFailed, [SysErrorMessage(LErrorCode)]);
+
+      try
+        { Write param to mem. }
+        Move(LParamBytes[Low(LParamBytes)], LMapViewOfFile^, LParamBytesSize);
+        DebugOutput('MapViewOfFile write param successful, broadcasting message now...');
+
+        { Sync broadcast message and waiting for the previous app to query
+          the param, we will exit normally if successed otherwise previous
+          app may be busy or even hung, we should give up and exit immediately. }
+        LSendMsgResult := SendMessageTimeout(HWND_BROADCAST, FAppMsgID,
+          WPARAM(LCurrentProcessId), LPARAM(LParamBytesSize), SMTO_NORMAL, 10000,
+          {$IFDEF DXE2AndUp}nil{$ELSE}lpdwResult{$ENDIF});
+
+        if LSendMsgResult <> 0 then
+          DebugOutput('SendMessageTimeout successful.')
+        else
+          DebugOutput('SendMessageTimeout failed, error: ''%s''.', [SysErrorMessage(GetLastError)]);
+      finally
+        UnmapViewOfFile(LMapViewOfFile);
+      end;
+    finally
+      CloseHandle(LMemFileMappingHandle);
+    end;
+  end;
 end;
 
-function OnlyOneAppInst(const AAppGlobalUniqueID: string; AOnPreviousAppCall: TATAppCallback): IATOnlyOneAppInst;
+procedure TATWinOnlyOneAppInst.ProcessAppCallback(APID: DWORD; AParamSize: Integer);
+var
+  LMemFileMappingName, LParamStr: string;
+  LMemFileMappingHandle: THandle;
+  LMapViewOfFile: Pointer;
+  LParamBytes: TBytes;
+  LErrorCode: DWORD;
 begin
-  Result := TATOnlyOneAppInst.Create(AAppGlobalUniqueID, AOnPreviousAppCall);
+  { Ignore if it is a self msg. }
+  if APID = GetCurrentProcessId then
+    Exit;
+
+  { No param callback. }
+  if APID = 0 then
+    DoAppCallback(APID, '')
+  else
+  begin
+    { Try open the mem that created by the new app. }
+    LMemFileMappingName := GetGlobalMemFileMappingName(APID);
+    LMemFileMappingHandle := OpenFileMapping(FILE_MAP_READ, False,
+      PChar(LMemFileMappingName));
+    LErrorCode := GetLastError;
+    if LMemFileMappingHandle = 0 then
+      raise Exception.CreateResFmt(@sOpenMemFileMappingFailed,
+        [LMemFileMappingName, SysErrorMessage(LErrorCode)]);
+    DebugOutput('OpenFileMapping ''%s'' successful.', [LMemFileMappingName]);
+
+    try
+      LMapViewOfFile := MapViewOfFile(LMemFileMappingHandle, FILE_MAP_READ, 0, 0, 0);
+      LErrorCode := GetLastError;
+      if LMapViewOfFile = nil then
+        raise Exception.CreateResFmt(@sAccessMemDataFailed,
+          [SysErrorMessage(LErrorCode)]);
+      DebugOutput('MapViewOfFile ''%s'' with readmode successful.', [LMemFileMappingName]);
+
+      try
+        SetLength(LParamBytes, AParamSize);
+        Move(LMapViewOfFile^, LParamBytes[Low(LParamBytes)], AParamSize);
+        LParamStr := BytesToStr(LParamBytes);
+        DebugOutput('Read param ''%s'' successful.', [LParamStr]);
+        DoAppCallback(APID, LParamStr);
+      finally
+        UnmapViewOfFile(LMapViewOfFile);
+      end;
+    finally
+      CloseHandle(LMemFileMappingHandle);
+    end;
+  end;
 end;
 
-{$ENDIF MSWINDOWS}
+function TATWinOnlyOneAppInst.StrToBytes(const AStr: string): TBytes;
+var
+  LWideStr: {$IFDEF UNICODE}string{$ELSE}WideString{$ENDIF};
+begin
+  { In windows, use default wide string. }
+  LWideStr := AStr;
+  SetLength(Result, Length(LWideStr) * SizeOf(LWideStr[1]));
+  if Length(Result) <> 0 then
+    Move(Pointer(LWideStr)^, Result[Low(Result)], Length(Result));
+end;
+
+function OnlyOneAppInst(const AAppGlobalUniqueID: string; AOnNextAppCall: TATAppCallback): IATOnlyOneAppInst;
+begin
+  Result := TATWinOnlyOneAppInst.Create(AAppGlobalUniqueID, AOnNextAppCall) as IATOnlyOneAppInst;
+end;
 
 end.
 

@@ -2,10 +2,9 @@ object FormOOAIMain: TFormOOAIMain
   Left = 0
   Top = 0
   BorderIcons = [biSystemMenu, biMinimize]
-  BorderWidth = 8
   Caption = 'EnsureOnlyOneAppInst'
-  ClientHeight = 62
-  ClientWidth = 460
+  ClientHeight = 243
+  ClientWidth = 539
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -15,32 +14,43 @@ object FormOOAIMain: TFormOOAIMain
   OldCreateOrder = False
   Position = poDesktopCenter
   OnCreate = FormCreate
+  DesignSize = (
+    539
+    243)
   PixelsPerInch = 96
   TextHeight = 13
   object LabelMsg: TLabel
     Left = 0
     Top = 0
-    Width = 460
-    Height = 62
+    Width = 539
+    Height = 41
     Cursor = crHandPoint
-    Hint = 'click me to hide this form .'
-    Align = alClient
-    Alignment = taCenter
+    Align = alTop
     AutoSize = False
-    Caption = 'Hi , I am a single instance application.'
+    Caption = 
+      '    This is a single app instance demo, you can start this app a' +
+      'gain with cmd line param.'
     Font.Charset = DEFAULT_CHARSET
     Font.Color = clWindowText
-    Font.Height = -21
+    Font.Height = -14
     Font.Name = 'Tahoma'
-    Font.Style = [fsBold]
+    Font.Style = []
     ParentFont = False
     ParentShowHint = False
     ShowHint = True
     Layout = tlCenter
     WordWrap = True
-    OnClick = LabelMsgClick
-    ExplicitTop = -1
-    ExplicitWidth = 412
-    ExplicitHeight = 98
+    ExplicitLeft = 8
+    ExplicitWidth = 554
+  end
+  object MemoLog: TMemo
+    Left = 8
+    Top = 47
+    Width = 523
+    Height = 188
+    Anchors = [akLeft, akTop, akRight, akBottom]
+    ScrollBars = ssVertical
+    TabOrder = 0
+    WordWrap = False
   end
 end

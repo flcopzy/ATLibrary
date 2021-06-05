@@ -115,26 +115,29 @@ Note: These examples are for Windows and the used file paths are hard-coded, so 
     program EnsureOnlyOneAppInst;
     
     uses
-      ...
+      Forms,
+	  ATOnlyOneAppInst,
       ...;
       
     const
       // You can define your own id.
-      CAppGlobalUniqueID = '{F1FB2123-DD15-44DF-B03B-9D724467AA34}_OnlyOneAppInst';
+      CAppGlobalUniqueID = '{F1FB2123-DD15-44DF-B03B-9D724467AA34}_OnlyOneAppInst_Demo';
       
-    procedure MyOnPreviousAppCall;
+    procedure MyOnAppCall(ANextPID: UInt64; const ANextParam: string);
     begin
-      DefaultActiveApp('App is already running.', 'Info', True, Application.MainForm);
+      // You can receive the next app's param if it exists.
     end;  
     
-    begin       
-      // NOTE: ATOnlyOneAppInst can only used in Windows.
+    begin        
+      // NOTE: ATOnlyOneAppInst currently only used in MSWindows.
       
+	  Application.Initialize;
+	  
       // Check whether the previous app is running.
       if OnlyOneAppInst(CAppGlobalUniqueID, MyOnPreviousAppCall).IsAppRunning then    
         Exit;
         
-      Application.Initialize;
+      
       Application.CreateForm(TFormOOAIMain, FormOOAIMain);
       Application.Run;
     end.   

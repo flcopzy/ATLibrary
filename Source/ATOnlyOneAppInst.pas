@@ -410,6 +410,7 @@ begin
     DebugOutput('OpenFileMapping ''%s'' successful.', [LMemFileMappingName]);
 
     try
+      { Try access the mem. }
       LMapViewOfFile := MapViewOfFile(LMemFileMappingHandle, FILE_MAP_READ, 0, 0, 0);
       LErrorCode := GetLastError;
       if LMapViewOfFile = nil then
@@ -418,10 +419,13 @@ begin
       DebugOutput('MapViewOfFile ''%s'' with readmode successful.', [LMemFileMappingName]);
 
       try
+        { Read param from mem. }
         SetLength(LParamBytes, AParamSize);
         Move(LMapViewOfFile^, LParamBytes[Low(LParamBytes)], AParamSize);
         LParamStr := BytesToStr(LParamBytes);
         DebugOutput('Read param ''%s'' successful.', [LParamStr]);
+
+        { Notify previous app. }
         DoAppCallback(APID, LParamStr);
       finally
         UnmapViewOfFile(LMapViewOfFile);

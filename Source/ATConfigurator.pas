@@ -66,6 +66,10 @@
     (2017.03.27) + Add CopyGroup to IATConfigurator.
                  * fix a bug in TATDBStorageProvider that does not
                    clear the return strings when read an empty section.
+
+  Version 1.007 by ZY:
+    (2021.06.07) + Add db connection check to TATDBStorageProvider.
+
 *)
 
 unit ATConfigurator;
@@ -149,7 +153,7 @@ uses
 {$ENDIF};
 
 const
-  ATConfiguratorVersion = '1.006';
+  ATConfiguratorVersion = '1.007';
 
 type
 
@@ -2037,6 +2041,7 @@ type
     function GetFireDAC_DBType: TATDBType;
     procedure CreateFireDACDriverLink(ADBType: TATDBType);
   {$ENDIF}
+    procedure CheckDBConnection;
     constructor Create(const ATableName: CString; ADBType: TATDBType); overload;
   public
     constructor Create(const AConnectionString, ATableName: CString{$IFDEF USE_ADO}; ADBType: TATDBType{$ENDIF}); reintroduce; overload;
@@ -2187,6 +2192,7 @@ begin
 {$ELSE USE_FIREDAC}
   FDataSet := TFDQuery.Create(nil);
   TFDQuery(FDataSet).Connection := TFDCustomConnection(ASharedConnection);
+  TFDQuery(FDataSet).Connection.ResourceOptions.AutoReconnect := True;
   FConnectStr := TFDCustomConnection(ASharedConnection).Params.Text;
   LDBType := GetFireDAC_DBType;
   CreateFireDACDriverLink(LDBType);
@@ -2237,6 +2243,8 @@ end;
 
 procedure TATDBStorageProvider.CreateTable;
 begin
+  CheckDBConnection;
+  
   with {$IFDEF USE_ADO}TADOQuery{$ELSE}TFDQuery{$ENDIF}(FDataSet) do
   begin
     SQL.Text := FSqlSupporter.GetSqlCreateTable;
@@ -2264,6 +2272,7 @@ end;
 
 procedure TATDBStorageProvider.EraseSection(const Section: CString);
 begin
+  CheckDBConnection;
   with {$IFDEF USE_ADO}TADOQuery{$ELSE}TFDQuery{$ENDIF}(FDataSet) do
   begin
     SQL.Text := FSqlSupporter.GetSqlDeleteGroup(Section);
@@ -2498,6 +2507,31 @@ begin
 {$ENDIF}
 end;
 
+procedure TATDBStorageProvider.CheckDBConnection;
+{$IFDEF USE_ADO}
+const
+  CConnection_OK     = 1;
+  CCOnnection_Broken = 2;
+var
+  LValue: Variant;
+  LIntValue: Integer;
+  LConnection: TADOConnection;
+{$ENDIF}  
+begin
+  { if the connection status is broken, then we close
+    the connection manually. }
+{$IFDEF USE_ADO}
+  LConnection := TADOQuery(FDataSet).Connection;
+  if LConnection.Connected then
+  begin
+    LValue := LConnection.Properties['Connection Status'].Value;
+    LIntValue := StrToIntDef(VarToStrDef(LValue, ''), CCOnnection_Broken);
+    if LIntValue = CCOnnection_Broken then
+      LConnection.Connected := False;
+  end;
+{$ENDIF}
+end;
+
 {$IFDEF USE_FIREDAC}
 function TATDBStorageProvider.GetFireDAC_DBType: TATDBType;
 var
@@ -2613,6 +2647,8 @@ procedure TATDBStorageProvider.ReadSections(Strings: TCStrings);
 var
   LFieldGroup: TField;
 begin
+  CheckDBConnection;
+  
   Strings.BeginUpdate;
   try
     Strings.Clear;
@@ -2642,6 +2678,8 @@ var
   LFieldKey: TField;
   LFieldValue: TField;
 begin
+  CheckDBConnection;
+  
   Strings.BeginUpdate;
   try
     Strings.Clear;
@@ -2673,6 +2711,8 @@ end;
 function TATDBStorageProvider.ReadString(const Section, Ident,
   Default: CString): CString;
 begin
+  CheckDBConnection;
+  
   with {$IFDEF USE_ADO}TADOQuery{$ELSE}TFDQuery{$ENDIF}(FDataSet) do
   begin
     SQL.Text := FSqlSupporter.GetSqlQueryValue(Section, Ident);
@@ -2720,6 +2760,8 @@ end;
 
 procedure TATDBStorageProvider.WriteString(const Section, Ident, Value: CString);
 begin
+  CheckDBConnection;
+
   with {$IFDEF USE_ADO}TADOQuery{$ELSE}TFDQuery{$ENDIF}(FDataSet) do
   begin
     SQL.Text := FSqlSupporter.GetSqlQueryValue(Section, Ident);

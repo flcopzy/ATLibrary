@@ -134,7 +134,7 @@ Note: These examples are for Windows and the used file paths are hard-coded, so 
 	  Application.Initialize;
 	  
       // Check whether the previous app is running.
-      if OnlyOneAppInst(CAppGlobalUniqueID, MyOnPreviousAppCall).IsAppRunning then    
+      if OnlyOneAppInst(CAppGlobalUniqueID, MyOnAppCall).IsAppRunning then    
         Exit;
         
       

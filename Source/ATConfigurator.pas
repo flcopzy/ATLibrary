@@ -2509,25 +2509,32 @@ end;
 
 procedure TATDBStorageProvider.CheckDBConnection;
 {$IFDEF USE_ADO}
-const
+const                  { Do not localize }
+  CConnStatusName    = 'Connection Status';
   CConnection_OK     = 1;
   CCOnnection_Broken = 2;
 var
-  LValue: Variant;
   LIntValue: Integer;
   LConnection: TADOConnection;
+  LNeedReconnectCheck: Boolean;
 {$ENDIF}  
 begin
   { if the connection status is broken, then we close
     the connection manually. }
 {$IFDEF USE_ADO}
-  LConnection := TADOQuery(FDataSet).Connection;
-  if LConnection.Connected then
+  { TODO : Refactoring later... }
+  LNeedReconnectCheck := FDBType in [dtMSSql, dtMySql];
+  if LNeedReconnectCheck then
   begin
-    LValue := LConnection.Properties['Connection Status'].Value;
-    LIntValue := StrToIntDef(VarToStrDef(LValue, ''), CCOnnection_Broken);
-    if LIntValue = CCOnnection_Broken then
-      LConnection.Connected := False;
+    LConnection := TADOQuery(FDataSet).Connection;
+    if LConnection.Connected then
+      try
+        LIntValue := LConnection.Properties[CConnStatusName].Value;
+        if LIntValue <> CConnection_OK then
+          LConnection.Connected := False;
+      except
+        { Ignore if prop not found. }
+      end;
   end;
 {$ENDIF}
 end;

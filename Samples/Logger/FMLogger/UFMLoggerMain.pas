@@ -1,7 +1,7 @@
 unit UFMLoggerMain;
 
 {
-   NOTE:  This demo was created on DelphiXE7 Update1.
+   NOTE:  This demo was first created on DelphiXE7 Update1.
 }
 
 interface
@@ -9,7 +9,7 @@ interface
 uses
   System.SysUtils, System.Types, System.UITypes, System.Classes, System.Variants,
   FMX.Types, FMX.Controls, FMX.Forms, FMX.Graphics, FMX.Dialogs, FMX.StdCtrls,
-  FMX.Layouts, FMX.Memo, FMX.ListBox;
+  FMX.Layouts, FMX.Memo, FMX.ListBox, FMX.Memo.Types, FMX.Controls.Presentation, FMX.ScrollBox;
 
 type
   TForm1 = class(TForm)
@@ -57,7 +57,15 @@ end;
 
 procedure TForm1.BDefLogClick(Sender: TObject);
 begin
-  Log.D('FM default logger executed...');
+  GetDefaultLogger.LogLevel := llAll;
+  case TATLogLevel(ComboBox1.ItemIndex) of
+    llTrace: GetDefaultLogger.T('FM default logger executed Trace...');
+    llDebug: GetDefaultLogger.D('FM default logger executed Debug...');
+    llInfo : GetDefaultLogger.I('FM default logger executed Info...');
+    llWarn : GetDefaultLogger.W('FM default logger executed Warn...');
+    llError: GetDefaultLogger.E('FM default logger executed Error...');
+    llFatal: GetDefaultLogger.F('FM default logger executed Fatal...');
+  end;
 end;
 
 procedure TForm1.BThreadsWriteClick(Sender: TObject);

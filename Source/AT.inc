@@ -129,6 +129,10 @@
     {$DEFINE MSWindowsOrMacOS}
   {$IFEND}
 
+  {$IF Defined(ANDROID) or Defined(IOS)}
+    {$DEFINE MOBILE}
+  {$IFEND}
+
 {$ELSE}
   {$MESSAGE WARN 'The compiler is too old, it may not be compatible.'}
 {$ENDIF}

@@ -55,9 +55,13 @@
 
   Version 1.005 by ZY:
     (2015.09.01) + Added OS info to the file logger header.
-                 * Fixed the cleaner that cannt clear the empty root dir.
+                 * Fixed the cleaner that can't clear the empty root dir.
     (2017.06.10) * A conditional compilation not matched fixed.
 
+  Version 1.006 by ZY:
+    (2021.06.16) - Remove "WAIT_FOR_FINISHED_WHEN_TERMINATED" switch, now
+                   use Logger.WaitforFinishedWhenTerminated.
+                 + Add more overload function to IATLogger.
 *)
 
 unit ATLogger;
@@ -66,8 +70,6 @@ unit ATLogger;
 {$WARN SYMBOL_PLATFORM OFF}
 
 interface
-
-{$DEFINE WAIT_FOR_FINISHED_WHEN_TERMINATED}
 
 uses
 
@@ -82,7 +84,7 @@ uses
   , Windows, Registry, Forms
   {$ENDIF}
 {$ELSE}
-  , FMX.Forms
+  , FMX.Forms, FMX.Types
 {$ENDIF}
   , SysUtils
 {$IFDEF TLIST_DEPRECATED}
@@ -104,36 +106,57 @@ uses
 
 const
 
-  ATLoggerVersion = '1.005';
+  ATLoggerVersion = '1.006';
 
 type
 
+  /// <summary> Log level values, in increasing order of priority. </summary>
   TATLogLevel = (llAll, llTrace, llDebug, llInfo, llWarn, llError, llFatal, llOff);
 
 const
 
+  /// <summary> Default log level value. </summary>
   LOG_DEFAULT_LEVEL = llDebug;
 
+  /// <summary> Default log level tags. </summary>
   LOG_LEVEL_CAPTIONS: array[TATLogLevel] of string =
     ('[All]', '[Trace]', '[Debug]', '[Info]', '[Warn]', '[Error]', '[Fatal]', '[Off]');
 
 type
 
-  ELogException = class(Exception);
-  ELogTooManyInstances = class(ELogException);
+  /// <summary> Base log exception. </summary>
+  EATLogException = class(Exception);
 
-{$IFDEF HAS_ANONYMOUSMETHOD}
-  TATLogFileNameFunc  = reference to function: string;
-  TATLogFileFoundFunc = reference to function(const AFileName: string): Boolean;
-{$ELSE}
-  TATLogFileNameFunc  = function: string;
-  TATLogFileFoundFunc = function(const AFileName: string): Boolean;
-{$ENDIF}
+  /// <summary> Log file name callback function, used by "NewFileLogger". </summary>
+  TATLogFileNameFunc  = {$IFDEF HAS_ANONYMOUSMETHOD}reference to {$ENDIF}function: string;
 
-  TATCustomLogObject = class(TInterfacedObject);
+  /// <summary> Log file found callback function, used by "CleanLogFiles". </summary>
+  TATLogFileFoundFunc = {$IFDEF HAS_ANONYMOUSMETHOD}reference to {$ENDIF}function(const AFileName: string): Boolean;
 
-{ LogElement }
+  { LogObject }
 
+  TATCustomLogObject = class;
+
+  /// <summary> An interface that return log object(now only for internal use). </summary>
+  IATLogObjectReference = interface
+    ['{754525A3-6268-4416-B290-D93201E49EFD}']
+    function GetLogObject: TATCustomLogObject;
+  end;
+
+  /// <summary> Base log object(e.g. formatter, outputter and so on). </summary>
+  TATCustomLogObject = class(TInterfacedObject, IATLogObjectReference)
+  private
+    FLoggerContextObject: Pointer;
+  protected
+    procedure LogException(const AExceptionMessage: string); virtual;
+  protected
+    { IATLogObjectReference }
+    function GetLogObject: TATCustomLogObject;
+  end;
+
+  { LogElement }
+
+  /// <summary> Main log element collection. </summary>
   PATLogElement = ^TATLogElement;
   TATLogElement = record
     Log: string;
@@ -141,13 +164,15 @@ type
     LogLevel: TATLogLevel;
   end;
 
-{ LogFormater }
+  { LogFormater }
 
+  /// <summary> Formater interface. </summary>
   IATLogFormater = interface
     ['{BF31162D-4408-496B-B680-E616BBF97DA3}']
     function LogFormat(const ALogElement: PATLogElement): string;
   end;
 
+  /// <summary> Base formater object. </summary>
   TATCustomLogFormater = class(TATCustomLogObject, IATLogFormater)
   private
     FFormatSettings: TFormatSettings;
@@ -158,29 +183,33 @@ type
     function LogFormat(const ALogElement: PATLogElement): string; virtual; abstract;
   public
     constructor Create; virtual;
-    property FormatSettings: TFormatSettings read FFormatSettings;
+    property FormatSettings: TFormatSettings read FFormatSettings write FFormatSettings;
     property Delimiter: string read FDelimiter write FDelimiter;
     property DateTimeFormat: string read FDateTimeFormat write FDateTimeFormat;
     property TimeZone: string read FTimeZone; 
   end;
 
+  /// <summary> Default formater. </summary>
   TATDefaultLogFormater = class(TATCustomLogFormater)
   protected
     function LogFormat(const ALogElement: PATLogElement): string; override;
   end;
 
+  /// <summary> A simple csv formater. </summary>
   TATCSVLogFormater = class(TATDefaultLogFormater)
   public
     constructor Create; override;
   end;
 
-{ LogOutputter }
+  { LogOutputter }
 
+  /// <summary> Outputter interface. </summary>
   IATLogOutputter = interface
     ['{AE122257-7EBF-47EB-8B70-ACA3E5C6FAFA}']
     procedure Output(const ALog: string; const ALogLevel: TATLogLevel);
   end;
 
+  /// <summary> Base outputter object. </summary>
   TATCustomLogOutputter = class(TATCustomLogObject, IATLogOutputter)
   private
     FLogFormater: IATLogFormater;
@@ -193,6 +222,7 @@ type
 
 { LogElementList }
 
+  /// <summary> Log element list. </summary>
   TATLogElementList = class({$IFDEF TLIST_DEPRECATED}TList<PATLogElement>{$ELSE}TList{$ENDIF})
   private
     function GetElement(AIndex: Integer): PATLogElement;
@@ -205,6 +235,7 @@ type
 
   TATCustomLogThread = TThread;
 
+  /// <summary> Async log outputter. </summary>
   TATAsyncLogOutputter = class(TATCustomLogOutputter)
   private
     FLogSiblingLists: array[Boolean] of TATLogElementList;
@@ -218,10 +249,8 @@ type
     function CreateSynchroObject: TSynchroObject; virtual;
     procedure Output(const ALog: string; const ALogLevel: TATLogLevel); override;
     procedure SiblingSwitch;
-  {$IFDEF WAIT_FOR_FINISHED_WHEN_TERMINATED}  
     procedure WaitForFinished;
-  {$ENDIF}
-    procedure Lock;   {$IFDEF HAS_INLINE}inline;{$ENDIF}
+    procedure Lock; {$IFDEF HAS_INLINE}inline;{$ENDIF}
     procedure UnLock; {$IFDEF HAS_INLINE}inline;{$ENDIF}
     property Producer: TATLogElementList read GetProducer;
     property Consumer: TATLogElementList read GetConsumer;
@@ -232,29 +261,51 @@ type
 
 { Logger }
 
+  /// <summary> Logger interface. </summary>
   IATLogger = interface
     ['{48B0835C-EAE5-4A93-BBEB-89B7AA666992}']
     { Property methods }
     function GetLogLevel: TATLogLevel;
-    procedure SetLogLevel(const ALogLevel: TATLogLevel);
+    procedure SetLogLevel(const AValue: TATLogLevel);
     function GetEnabled: Boolean;
-    procedure SetEnabled(const Value: Boolean);
+    procedure SetEnabled(const AValue: Boolean);
+    function GetWFWT: Boolean;
+    procedure SetWFWT(const AValue: Boolean);
     { Methods}
-    procedure T(const ATraceStr: string);
-    procedure D(const ADebugStr: string);
-    procedure I(const AInfoStr : string);
-    procedure W(const AWarnStr : string);
-    procedure E(const AErrorStr: string);
-    procedure F(const AFatalStr: string);
+    procedure T(const ATraceStr: string); overload;
+    procedure T(const ATraceStr: string; const AArgs: array of const); overload;
+    procedure T(const ATraceStr: string; const AArgs: array of const; AFormatSettings: TFormatSettings); overload;
+
+    procedure D(const ADebugStr: string); overload;
+    procedure D(const ADebugStr: string; const AArgs: array of const); overload;
+    procedure D(const ADebugStr: string; const AArgs: array of const; AFormatSettings: TFormatSettings); overload;
+
+    procedure I(const AInfoStr:  string); overload;
+    procedure I(const AInfoStr:  string; const AArgs: array of const); overload;
+    procedure I(const AInfoStr:  string; const AArgs: array of const; AFormatSettings: TFormatSettings); overload;
+
+    procedure W(const AWarnStr:  string); overload;
+    procedure W(const AWarnStr:  string; const AArgs: array of const); overload;
+    procedure W(const AWarnStr:  string; const AArgs: array of const; AFormatSettings: TFormatSettings); overload;
+
+    procedure E(const AErrorStr: string); overload;
+    procedure E(const AErrorStr: string; const AArgs: array of const); overload;
+    procedure E(const AErrorStr: string; const AArgs: array of const; AFormatSettings: TFormatSettings); overload;
+
+    procedure F(const AFatalStr: string); overload;
+    procedure F(const AFatalStr: string; const AArgs: array of const); overload;
+    procedure F(const AFatalStr: string; const AArgs: array of const; AFormatSettings: TFormatSettings); overload;
     { Properties }
     property LogLevel: TATLogLevel read GetLogLevel write SetLogLevel;
     property Enabled: Boolean read GetEnabled write SetEnabled;
+    /// <summary> Waitfor finished when logging terminated(default is true). </summary>
+    property WaitforFinishedWhenTerminated: Boolean read GetWFWT write SetWFWT;
   end;
 
 { GetDefaultLogger:
-    
-   The default logger that uses a default formater and outputter
-   for outputting logs via native methods on different platforms.
+
+   The default logger uses a default formater and outputter for
+   outputting logs via native methods on different platforms.
 
   Useage:
 
@@ -284,13 +335,6 @@ type
 
     // Will be executed again.
     Logger.I('My Info Strings');
-
-    // The logger will auto destroyed when it no longer be used.
-
-    // NOTE: if you are using ATlogger in a DLL, do not free
-    //       any loggers in the finalization which will cause
-    //       an infinite loop(the waitfor always return timeout)
-    //       , and you should free it manually.
  }
 function GetDefaultLogger: IATLogger;
 
@@ -300,10 +344,20 @@ function GetDefaultLogger: IATLogger;
 
   Useage:
 
-  MyLogger := NewLogger(TMyOutputter.Create(TMyLogFormater.Create));
+  MyLogger := NewLogger(TMyOutputter.Create(TMyLogFormater.Create as IATLogFormater) as IATLogOutputter);
 
   // Or
+
   MyLogger := NewLogger(ExistingIMyOutputter);
+
+  ... do some logging...
+
+  // The logger will auto destroyed when it no longer be used.
+
+  // NOTE: If you are using logger in a DLL, do not free any
+  //       loggers in the finalization which will cause an
+  //       infinite loop(the waitfor always return timeout),
+  //       and you should free it manually.
 }
 function NewLogger(const AOutputter: IATLogOutputter; const ALevel: TATLogLevel = LOG_DEFAULT_LEVEL): IATLogger;
 
@@ -318,17 +372,23 @@ function NewLogger(const AOutputter: IATLogOutputter; const ALevel: TATLogLevel 
 
       // Output a debug info.
       MyFileLogger.D('Debug info will be written to a file.');
-      
+                                                 s
       ...
-      
+
     - Write logs to files every day:
 
       // NOTE: 1. EveryDayLogFileName is called in thread, so CAREFULLY
-      //          use the global vars and VCL objects.
-      //       2. NEVER use multiple log instances to write to the same
-      //          file, it's not safe.
+      //          use the global vars and VCL/FMX objects.
+      //
+      //       2. NEVER use multiple log instances in different threads
+      //          to write to the same file, it's not safe, however you
+      //          can use one instance in different threads.
+      //
       //       3. If an exception occured inside this function, an empty
       //          string will be returned.
+      //
+      //       4. The Default file logger will output logs in utf8 format
+      //          on all platforms.
 
       function EveryDayLogFileName: string;
       begin
@@ -348,7 +408,7 @@ function NewLogger(const AOutputter: IATLogOutputter; const ALevel: TATLogLevel 
       
     - Write logs to csv file.
 
-      CSVFileLogger := NewFileLogger(EveryDayLogFileName, TATCSVLogFormater.Create);
+      CSVFileLogger := NewFileLogger(EveryDayLogFileName, TATCSVLogFormater.Create as IATLogFormater);
       ...
 }
 function NewFileLogger(ALogFileNameFunc: TATLogFileNameFunc; const ALogFormater: IATLogFormater = nil; ALogLevel: TATLogLevel = LOG_DEFAULT_LEVEL): IATLogger; overload;
@@ -378,7 +438,7 @@ function NewFileLogger(const ALogFileName: string = ''; const ALogFormater: IATL
     CleanLogFiles(['C:\DebugLogs'], LogFileNameLen5);
 
     // Delete all log files from "C:\DebugLogs" synchronize.
-    CleanLogFiles(['C:\DebugLogs'], nil, False);
+    CleanLogFiles(['C:\DebugLogs'], nil, True, False);
 }
 procedure CleanLogFiles(const ALogFileDirs: array of string; ALogFileFoundFunc: TATLogFileFoundFunc = nil;
   ASubDir: Boolean = True; Async: Boolean = True);
@@ -392,8 +452,11 @@ implementation
 resourcestring
 
   sLogTooManyInstances = 'Too many log instances created, the max count current supported is %d.';
+  sLogInvalidLogLevel  = 'Invalid log level %d';
 
 const
+
+  LOG_DEFAULT_DATETIMEFORMAT = 'yyyy-mm-dd hh:nn:ss.zzz';
 
   { The max count of the log elements. }
   LOG_MAX_ITEMCOUNT     = 4 * 1024 * 1024;
@@ -406,36 +469,34 @@ const
 
   { The max log instance count current supported, if
     you creating more. an exception will be raised. }
-  LOG_MAX_INSTANCECOUNT = 20;
+  LOG_MAX_INSTANCECOUNT = 64;
 
 var
 
 (* Internal vars *)
 
   { A singleton logger that use the default log formater. }
-  InternalDefaultLogger   : IATLogger;
+  InternalDefaultLogger: IATLogger;
 
   { An internal global synchro object. }
-  InternalThreadLock      : TSynchroObject;
+  InternalThreadLock: TSynchroObject;
 
-  { a logger instance counter for internal use. }
+  { A logger instance counter for internal use. }
   InternalLogInstanceCount: Integer;  
 
-  
 (* Internal immutable vars *)
 
   { Cached OS name. }
-  InternalOSName  : string;
+  InternalOSName: string;
 
   { App name for internal use. }
-  InternalAppName : string;
+  InternalAppName: string;
 
   { Time zone for internal use. }
   InternalTimeZone: string;
 
-  { The DefaultLogFileName(with path) used when you creating
-    a log file with a empty name. }
-  InternalDefaultLogFileName   : string;
+  { Used when you creating a log file with a empty name. }
+  InternalDefaultLogFileName: string;
 
   { Default format settings for internal use. }
   InternalDefaultFormatSettings: TFormatSettings;
@@ -546,9 +607,8 @@ const
     LCSDVersion: string;
   begin
     LRegistry := TRegistry.Create(KEY_READ);
-    LRegistry.RootKey := HKEY_LOCAL_MACHINE;
-  
     try
+      LRegistry.RootKey := HKEY_LOCAL_MACHINE;
       if LRegistry.OpenKey('SOFTWARE\Microsoft\Windows NT\CurrentVersion', False) then
         try
           LProductName := LRegistry.ReadString('ProductName');
@@ -640,6 +700,13 @@ begin
   Result := IncludeTrailingPathDelimiter(Result) + 'Logs' + PathDelim;
 end;
 
+{ TATCustomLogObject }
+
+function TATCustomLogObject.GetLogObject: TATCustomLogObject;
+begin
+  Result := Self;
+end;
+
 type
 
   TATLogIdentifier = class
@@ -652,13 +719,13 @@ type
   protected
     procedure DoAsycLog(const ALogs: TATLogElementList); override;
   public
-    class procedure NativeOutput(const ALog: string); {$IFDEF HAS_INLINE}inline;{$ENDIF}
+    class procedure NativeOutput(const ALog: string; ALogLevel: TATLogLevel); {$IFDEF HAS_INLINE}inline;{$ENDIF}
   end;
 
   TATFileLogOutputter = class(TATAsyncLogOutputter)
   private
     FMaxSingleFileSize: Cardinal;
-    procedure SetMaxSingleFileSize(const Value: Cardinal);
+    procedure SetMaxSingleFileSize(const AValue: Cardinal);
   protected
     function GetLogFileName: string; virtual;
     function GetOutputLogFileName: string; virtual;
@@ -674,7 +741,7 @@ type
     { The actual outout log file name. }
     property OutputLogFileName: string read GetOutputLogFileName;
 
-    { The max size of each log file.      
+    { The max size of each log file.
       Note: The Log file size may not equal to this value, as
             it will be checked after the last log buffer flush
             to the file. }
@@ -722,22 +789,52 @@ type
     FLogOutputter: IATLogOutputter;
     FLogLevel: TATLogLevel;
     FEnabled: Boolean;
+    FWaitforFinishedWhenTerminated: Boolean;
     procedure DoLog(const ALog: string; const ALogLevel: TATLogLevel); {$IFDEF HAS_INLINE}inline;{$ENDIF}
+    procedure DoLogException(AExceptionTriger: TObject; const AExceptionMessage: string);
+  protected
+    { IATLogger }
+    function GetLogLevel: TATLogLevel;
+    procedure SetLogLevel(const AValue: TATLogLevel);
+    function GetEnabled: Boolean;
+    procedure SetEnabled(const AValue: Boolean);
+    function GetWFWT: Boolean;
+    procedure SetWFWT(const AValue: Boolean);
+    function GetOutputter: TATCustomLogOutputter;
+    function GetFormater: TATCustomLogFormater;
+
+    procedure T(const ATraceStr: string); overload; {$IFDEF HAS_INLINE}inline;{$ENDIF}
+    procedure T(const ATraceStr: string; const AArgs: array of const); overload;
+    procedure T(const ATraceStr: string; const AArgs: array of const; AFormatSettings: TFormatSettings); overload;
+
+    procedure D(const ADebugStr: string); overload; {$IFDEF HAS_INLINE}inline;{$ENDIF}
+    procedure D(const ADebugStr: string; const AArgs: array of const); overload;
+    procedure D(const ADebugStr: string; const AArgs: array of const; AFormatSettings: TFormatSettings); overload;
+
+    procedure I(const AInfoStr: string); overload; {$IFDEF HAS_INLINE}inline;{$ENDIF}
+    procedure I(const AInfoStr: string; const AArgs: array of const); overload;
+    procedure I(const AInfoStr: string; const AArgs: array of const; AFormatSettings: TFormatSettings); overload;
+
+    procedure W(const AWarnStr: string); overload; {$IFDEF HAS_INLINE}inline;{$ENDIF}
+    procedure W(const AWarnStr: string; const AArgs: array of const); overload;
+    procedure W(const AWarnStr: string; const AArgs: array of const; AFormatSettings: TFormatSettings); overload;
+
+    procedure E(const AErrorStr: string); overload; {$IFDEF HAS_INLINE}inline;{$ENDIF}
+    procedure E(const AErrorStr: string; const AArgs: array of const); overload;
+    procedure E(const AErrorStr: string; const AArgs: array of const; AFormatSettings: TFormatSettings); overload;
+
+    procedure F(const AFatalStr: string); overload; {$IFDEF HAS_INLINE}inline;{$ENDIF}
+    procedure F(const AFatalStr: string; const AArgs: array of const); overload;
+    procedure F(const AFatalStr: string; const AArgs: array of const; AFormatSettings: TFormatSettings); overload;
   public
     constructor Create(const AOutputter: IATLogOutputter; const ALevel: TATLogLevel = LOG_DEFAULT_LEVEL);
     destructor Destroy; override;
-    { IATLogger }
-    procedure T(const ATraceStr: string); {$IFDEF HAS_INLINE}inline;{$ENDIF}
-    procedure D(const ADebugStr: string); {$IFDEF HAS_INLINE}inline;{$ENDIF}
-    procedure I(const AInfoStr : string); {$IFDEF HAS_INLINE}inline;{$ENDIF}
-    procedure W(const AWarnStr : string); {$IFDEF HAS_INLINE}inline;{$ENDIF}
-    procedure E(const AErrorStr: string); {$IFDEF HAS_INLINE}inline;{$ENDIF}
-    procedure F(const AFatalStr: string); {$IFDEF HAS_INLINE}inline;{$ENDIF}
-    function GetLogLevel: TATLogLevel;
-    procedure SetLogLevel(const Value: TATLogLevel);
-    function GetEnabled: Boolean;
-    procedure SetEnabled(const Value: Boolean);
   end;
+
+procedure TATCustomLogObject.LogException(const AExceptionMessage: string);
+begin
+  TATLoggerContext(FLoggerContextObject).DoLogException(Self, AExceptionMessage);
+end;
 
 { TATLoggerContext }
 
@@ -749,6 +846,7 @@ begin
 
   SetLogLevel(ALevel);
   FEnabled := True;
+  FWaitforFinishedWhenTerminated := True;
 
   FLogOutputter := AOutputter;
 end;
@@ -756,6 +854,17 @@ end;
 procedure TATLoggerContext.D(const ADebugStr: string);
 begin
   DoLog(ADebugStr, llDebug);
+end;
+
+procedure TATLoggerContext.D(const ADebugStr: string;
+  const AArgs: array of const; AFormatSettings: TFormatSettings);
+begin
+  D(Format(ADebugStr, AArgs, AFormatSettings));
+end;
+
+procedure TATLoggerContext.D(const ADebugStr: string; const AArgs: array of const);
+begin
+  D(Format(ADebugStr, AArgs));
 end;
 
 destructor TATLoggerContext.Destroy;
@@ -776,6 +885,41 @@ begin
     FLogOutputter.Output(ALog, ALogLevel);
 end;
 
+procedure TATLoggerContext.DoLogException(AExceptionTriger: TObject;
+  const AExceptionMessage: string);
+var
+  LExceptionMessage: string;
+begin
+  if (AExceptionTriger = nil) or (AExceptionMessage = '') then
+    Exit;
+
+  LExceptionMessage := FormatDateTime(LOG_DEFAULT_DATETIMEFORMAT, Now(), InternalDefaultFormatSettings)
+    + LOG_LEVEL_CAPTIONS[llError] + ' ' + AExceptionTriger.ClassName + ': ' + AExceptionMessage;
+  TATDefaultLogOutputter.NativeOutput(LExceptionMessage, llError);
+end;
+
+procedure TATLoggerContext.E(const AErrorStr: string; const AArgs: array of const;
+  AFormatSettings: TFormatSettings);
+begin
+  E(Format(AErrorStr, AArgs, AFormatSettings));
+end;
+
+procedure TATLoggerContext.F(const AFatalStr: string; const AArgs: array of const;
+  AFormatSettings: TFormatSettings);
+begin
+  F(Format(AFatalStr, AArgs, AFormatSettings));
+end;
+
+procedure TATLoggerContext.F(const AFatalStr: string; const AArgs: array of const);
+begin
+  F(Format(AFatalStr, AArgs));
+end;
+
+procedure TATLoggerContext.E(const AErrorStr: string; const AArgs: array of const);
+begin
+  E(Format(AErrorStr, AArgs));
+end;
+
 procedure TATLoggerContext.E(const AErrorStr: string);
 begin
   DoLog(AErrorStr, llError);
@@ -791,9 +935,51 @@ begin
   Result := FEnabled;
 end;
 
+function TATLoggerContext.GetFormater: TATCustomLogFormater;
+var
+  LIntf: IATLogObjectReference;
+  LOutputter: TATCustomLogOutputter;
+begin
+  LOutputter := GetOutputter;
+  if Supports(LOutputter.FLogFormater, IATLogObjectReference, LIntf) then
+    Result := TATCustomLogFormater(LIntf.GetLogObject)
+  else
+    Result := nil;
+
+  Assert(Result <> nil);
+end;
+
 function TATLoggerContext.GetLogLevel: TATLogLevel;
 begin
   Result := FLogLevel;
+end;
+
+function TATLoggerContext.GetOutputter: TATCustomLogOutputter;
+var
+  LIntf: IATLogObjectReference;
+begin
+  if Supports(FLogOutputter, IATLogObjectReference, LIntf) then
+    Result := TATCustomLogOutputter(LIntf.GetLogObject)
+  else
+    Result := nil;
+
+  Assert(Result <> nil);
+end;
+
+function TATLoggerContext.GetWFWT: Boolean;
+begin
+  Result := FWaitforFinishedWhenTerminated;
+end;
+
+procedure TATLoggerContext.I(const AInfoStr: string; const AArgs: array of const;
+  AFormatSettings: TFormatSettings);
+begin
+  I(Format(AInfoStr, AArgs, AFormatSettings));
+end;
+
+procedure TATLoggerContext.I(const AInfoStr: string; const AArgs: array of const);
+begin
+  I(Format(AInfoStr, AArgs));
 end;
 
 procedure TATLoggerContext.I(const AInfoStr: string);
@@ -801,20 +987,45 @@ begin
   DoLog(AInfoStr, llInfo);
 end;
 
-procedure TATLoggerContext.SetEnabled(const Value: Boolean);
+procedure TATLoggerContext.SetEnabled(const AValue: Boolean);
 begin
-  FEnabled := Value;
+  FEnabled := AValue;
 end;
 
-procedure TATLoggerContext.SetLogLevel(const Value: TATLogLevel);
+procedure TATLoggerContext.SetLogLevel(const AValue: TATLogLevel);
 begin
-{$IFDEF DEBUG_LOG}
-  Assert((Value >= Low(TATLogLevel)) and (Value <= High(TATLogLevel)),
-    'Invalid LogLevel ' + IntToStr(Ord(Value)));
-{$ENDIF}
-  FLogLevel := Value;
+  if (AValue < Low(TATLogLevel)) or (AValue > High(TATLogLevel)) then
+    raise EATLogException.CreateResFmt(@sLogInvalidLogLevel, [Ord(AValue)]);
+
+  FLogLevel := AValue;
 end;
- 
+
+procedure TATLoggerContext.SetWFWT(const AValue: Boolean);
+begin
+  FWaitforFinishedWhenTerminated := AValue;
+end;
+
+procedure TATLoggerContext.T(const ATraceStr: string; const AArgs: array of const; AFormatSettings: TFormatSettings);
+begin
+  T(Format(ATraceStr, AArgs, AFormatSettings));
+end;
+
+procedure TATLoggerContext.W(const AWarnStr: string; const AArgs: array of const;
+  AFormatSettings: TFormatSettings);
+begin
+  W(Format(AWarnStr, AArgs, AFormatSettings));
+end;
+
+procedure TATLoggerContext.W(const AWarnStr: string; const AArgs: array of const);
+begin
+  W(Format(AWarnStr, AArgs));
+end;
+
+procedure TATLoggerContext.T(const ATraceStr: string; const AArgs: array of const);
+begin
+  T(Format(ATraceStr, AArgs));
+end;
+
 procedure TATLoggerContext.T(const ATraceStr: string);
 begin
   DoLog(ATraceStr, llTrace);
@@ -830,7 +1041,9 @@ begin
   InternalThreadLock.Acquire;
   try
     if not Assigned(InternalDefaultLogger) then
-      InternalDefaultLogger := NewLogger(TATDefaultLogOutputter.Create(TATDefaultLogFormater.Create));
+      InternalDefaultLogger := NewLogger(
+        TATDefaultLogOutputter.Create(
+          TATDefaultLogFormater.Create as IATLogFormater) as IATLogOutputter);
     Result := InternalDefaultLogger;
   finally
     InternalThreadLock.Release;
@@ -848,11 +1061,16 @@ begin
 end;
 
 function NewLogger(const AOutputter: IATLogOutputter; const ALevel: TATLogLevel): IATLogger;
+var
+  LLoggerContext: TATLoggerContext;
 begin
   if Atomic_Read(InternalLogInstanceCount) = LOG_MAX_INSTANCECOUNT then
-    raise ELogTooManyInstances.CreateResFmt(@sLogTooManyInstances, [LOG_MAX_INSTANCECOUNT]);
+    raise EATLogException.CreateResFmt(@sLogTooManyInstances, [LOG_MAX_INSTANCECOUNT]);
 
-  Result := TATLoggerContext.Create(AOutputter, ALevel);
+  LLoggerContext := TATLoggerContext.Create(AOutputter, ALevel);
+  LLoggerContext.GetOutputter.FLoggerContextObject := LLoggerContext;
+  LLoggerContext.GetFormater.FLoggerContextObject  := LLoggerContext;
+  Result := LLoggerContext as IATLogger;
 end;
 
 procedure CleanLogFiles(const ALogFileDirs: array of string; ALogFileFoundFunc: TATLogFileFoundFunc;
@@ -949,7 +1167,7 @@ var
   LLogElement: PATLogElement;
 begin
   New(LLogElement);
-  LLogElement^.Log := ALog;
+  SetString(LLogElement^.Log, PChar(ALog), Length(ALog));
   LLogElement^.LogTriggerTime := Now;
   LLogElement^.LogLevel := ALogLevel;
   Result := Add(LLogElement);
@@ -963,6 +1181,7 @@ begin
     Dispose(Elements[I]);
 
   Count := 0;
+
   if Capacity >= LOG_LIST_IC_SHRINK then
     Capacity := LOG_LIST_IC;
 end;
@@ -985,7 +1204,7 @@ begin
   inherited;
   FFormatSettings := GetFormatSettings;
   FDelimiter      := ' ';
-  FDateTimeFormat := 'yyyy-mm-dd hh:nn:ss.zzz';
+  FDateTimeFormat := LOG_DEFAULT_DATETIMEFORMAT;
   FTimeZone       := GetTimeZone;
 end;
 
@@ -996,8 +1215,7 @@ begin
   { e.g. 2014-10-01 11:25:16.123 [Debug] Text }
   with ALogElement^ do
     Result := FormatDateTime(FDateTimeFormat, LogTriggerTime, FFormatSettings) +
-              LOG_LEVEL_CAPTIONS[LogLevel] + FDelimiter +
-              Log;
+              LOG_LEVEL_CAPTIONS[LogLevel] + FDelimiter + Log;
 end;
 
 { TATCSVLogFormater }
@@ -1025,17 +1243,14 @@ type
 
   TAsyncLogThread = class(TATCustomLogThread)
   private
-    FLastLogErrorMsg: string;
     {$IFDEF AUTOREFCOUNT}[unsafe]{$ENDIF} FOwner: TATAsyncLogOutputter;
     FAsyncOutputEvent: TAsyncOutputEvent;
-    procedure SetLogErrorMsg(const AException: Exception); {$IFDEF HAS_INLINE}inline;{$ENDIF}
     procedure ThreadSwitch(const AItemCount: Integer); {$IFDEF HAS_INLINE}inline;{$ENDIF}
   protected
     procedure Execute; override;
   public
     constructor Create(AOwner: TATAsyncLogOutputter; AAsyncOutputEvent: TAsyncOutputEvent;
       ACreateSuspended: Boolean);
-    property LastLogErrorMsg: string read FLastLogErrorMsg;
   end;
 
 { TAsyncLogThread }
@@ -1043,37 +1258,44 @@ type
 constructor TAsyncLogThread.Create(AOwner: TATAsyncLogOutputter;
   AAsyncOutputEvent: TAsyncOutputEvent; ACreateSuspended: Boolean);
 begin
+  inherited Create(ACreateSuspended);
   FOwner := AOwner;
   FAsyncOutputEvent := AAsyncOutputEvent;
   FreeOnTerminate := False;
-  inherited Create(ACreateSuspended);
 end;
 
 procedure TAsyncLogThread.ThreadSwitch(const AItemCount: Integer);
 {$WARN SYMBOL_PLATFORM OFF}
 const
-  // 131072 lines
-  NormalCount = 128 * 1024;
+{$IFNDEF MOBILE}
+  CFactor = 1;
+{$ELSE}
+  CFactor = 8;
+{$ENDIF}
+  CNormalCount = (128 * 1024) div CFactor;
+  CHigherCount =  2 * CNormalCount;
 {$IFDEF MSWINDOWS}
 var
   LNeedPriority: TThreadPriority;
 {$ENDIF}
 begin
 
-  // Normal work
-  if AItemCount <= NormalCount then
-  begin
 {$IFDEF MSWINDOWS}
-    LNeedPriority := tpNormal;
+  LNeedPriority := tpNormal;
 {$ENDIF}
-    Sleep(10);
-  end else
+
+  { Normal work }
+  if AItemCount <= CNormalCount then
+    Sleep(10 * CFactor)
+  else if (AItemCount > CNormalCount) and (AItemCount <= CHigherCount) then
+    Sleep(4 * CFactor)
+  else
   begin
-  // Heavy work
+    { Heavy work }
 {$IFDEF MSWINDOWS}
     LNeedPriority := tpHigher;
 {$ENDIF}
-    Sleep(1);
+    Sleep(1 * CFactor);
   end;
   
 {$IFDEF MSWINDOWS}
@@ -1106,7 +1328,7 @@ begin
               FAsyncOutputEvent(Consumer);
             except
               on E: Exception do
-                SetLogErrorMsg(E);
+                LogException(E.Message);
             end;
         finally
           { Ensure Consumer is cleared even FAsyncOutputEvent = nil. }
@@ -1114,13 +1336,6 @@ begin
         end;
         
     end;
-end;
-
-procedure TAsyncLogThread.SetLogErrorMsg(const AException: Exception);
-begin
-  { e.g. TLogOutputterClass\ExceptionClass: msg }
-  FLastLogErrorMsg := FOwner.ClassName + '\' +
-                      AException.ClassName + ': ' + AException.Message;
 end;
 
 {$IFDEF HAS_OBJECTLOCK}
@@ -1222,13 +1437,8 @@ end;
 
 destructor TATAsyncLogOutputter.Destroy;
 begin
-{$IFDEF WAIT_FOR_FINISHED_WHEN_TERMINATED}
-  WaitForFinished;
-{$ENDIF}
-
-  with TAsyncLogThread(FLogOutputWorker) do
-    if LastLogErrorMsg <> '' then
-      TATDefaultLogOutputter.NativeOutput(LastLogErrorMsg);
+  if TATLoggerContext(FLoggerContextObject).GetWFWT() then
+    WaitForFinished;
 
   FreeAndNil(FLogOutputWorker);
   FreeAndNil(FLogSiblingLists[False]);
@@ -1256,7 +1466,6 @@ procedure TATAsyncLogOutputter.Output(const ALog: string; const ALogLevel: TATLo
 label
   WaitFor;
 begin
-
   WaitFor:
 
     Lock;
@@ -1270,16 +1479,19 @@ begin
       UnLock;
     end;
 
+    { If we get here, the producer is too fast and need to
+      reduce productivity. }
+
     if {$IFDEF MSWINDOWS}GetCurrentThreadId
        {$ELSE}TThread.CurrentThread.ThreadID
        {$ENDIF} = MainThreadID then
-      { There is still a change to output logs in main thread.}
+      { Use ProcessMessages may has side effects, but we
+        don't want to block ui. }
       Application.ProcessMessages;
 
     Sleep(50);
 
   goto WaitFor;
-
 end;
 
 procedure TATAsyncLogOutputter.SiblingSwitch;
@@ -1292,10 +1504,10 @@ begin
   FSynchroObject.Release;
 end;
 
-{$IFDEF WAIT_FOR_FINISHED_WHEN_TERMINATED}
 procedure TATAsyncLogOutputter.WaitForFinished;
 begin
-  { The outputter has stopped, now waiting for the final flush work. }
+  { The outputter has stopped, now waiting for
+    the final flush work. }
   while True do
   begin
     Lock;
@@ -1308,19 +1520,22 @@ begin
     end;
   end;
 end;
-{$ENDIF}
 
 { TATDefaultLogOutputter }
 
 procedure TATDefaultLogOutputter.DoAsycLog(const ALogs: TATLogElementList);
 var
   I: Integer;
+  LLogElement: PATLogElement;
 begin
   for I := 0 to ALogs.Count - 1 do
-    NativeOutput(FLogFormater.LogFormat(ALogs[I]));
+  begin
+    LLogElement := ALogs[I];
+    NativeOutput(FLogFormater.LogFormat(LLogElement), LLogElement.LogLevel);
+  end;
 end;
 
-class procedure TATDefaultLogOutputter.NativeOutput(const ALog: string);
+class procedure TATDefaultLogOutputter.NativeOutput(const ALog: string; ALogLevel: TATLogLevel);
 
 {$IFDEF IOS}
   function PNSStr(const AStr: string): PNSString;
@@ -1332,12 +1547,12 @@ class procedure TATDefaultLogOutputter.NativeOutput(const ALog: string);
 {$IFDEF ANDROID}
 var
   LMarshaller: TMarshaller;
+  LText: MarshaledAString;
 {$ENDIF}
 begin
 {$IFDEF MSWINDOWS}
-
  { You can see the results in Delphi (View - Debug Windows - Event Log)
-   in debug mode, or use the tool: dbgview.exe from "http://www.sysinternals.com" . }  
+   in debug mode, or use the tool: dbgview.exe from "http://www.sysinternals.com" . }
   OutputDebugString(PChar(ALog));
 {$ENDIF}
 
@@ -1352,10 +1567,19 @@ begin
 {$ENDIF}
 
 {$IFDEF ANDROID}
+  LText := LMarshaller.AsAnsi(ALog).ToPointer;
+  case ALogLevel of
+    llDebug:  Androidapi.Log.__android_log_write(android_LogPriority.ANDROID_LOG_DEBUG, 'debug', LText);
+    llInfo:   LOGI(LText);
+    llWarn:   LOGW(LText);
+    llError:  LOGE(LText);
+    llFatal:  LOGF(LText);
+    else      Androidapi.Log.__android_log_write(android_LogPriority.ANDROID_LOG_VERBOSE, 'verbose', LText);
+  end;
+{$ENDIF}
 
-  { The log type was not classified in Android, we current only use
-    the info type, others types please see Androidapi.Log.pas. }
-  LOGI(LMarshaller.AsAnsi(ALog).ToPointer);
+{$IFDEF LINUX}
+  Log.d(ALog);
 {$ENDIF}
 end;
 
@@ -1627,14 +1851,14 @@ begin
   end;
 end;
 
-procedure TATFileLogOutputter.SetMaxSingleFileSize(const Value: Cardinal);
+procedure TATFileLogOutputter.SetMaxSingleFileSize(const AValue: Cardinal);
 begin
-  if Value > TEXTFILE_MAXSIZE then
+  if AValue > TEXTFILE_MAXSIZE then
     FMaxSingleFileSize := TEXTFILE_MAXSIZE
-  else if Value = 0 then
+  else if AValue = 0 then
     FMaxSingleFileSize := TEXTFILE_MAXSINGLESIZE
   else
-    FMaxSingleFileSize := Value;
+    FMaxSingleFileSize := AValue;
 end;
 
 constructor TATFileLogOutputter.Create(const ALogFormater: IATLogFormater);
@@ -1763,7 +1987,11 @@ begin
     try
       Result := FLogFileNameFunc()
     except
-      Result := '';
+      on E: Exception do
+      begin
+        Result := '';
+        LogException(E.Message);
+      end;
     end
   else
     Result := inherited GetLogFileName();  

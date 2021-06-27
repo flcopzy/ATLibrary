@@ -59,13 +59,13 @@ end;
 procedure TFrmLoggerMain.Button1Click(Sender: TObject);
 begin
   with LoggerDemo do
-    case TComponent(Sender).Tag of
-      1: DefaultLog.T('Log Trace Test');
-      2: DefaultLog.D('Log Debug Test');
-      3: DefaultLog.I('Log Info Test');
-      4: DefaultLog.W('Log Warn Test');
-      5: DefaultLog.E('Log Error Test');
-      6: DefaultLog.F('Log Fatal Test');
+    case TATLogLevel(TComponent(Sender).Tag) of
+      llTrace: DefaultLog.T('Log Trace Test');
+      llDebug: DefaultLog.D('Log Debug Test %d', [GetCurrentThreadId]);
+      llInfo:  DefaultLog.I('Log Info Test');
+      llWarn:  DefaultLog.W('Log Warn Test');
+      llError: DefaultLog.E('Log Error Test');
+      llFatal: DefaultLog.F('Log Fatal Test');
     end;
 end;
 

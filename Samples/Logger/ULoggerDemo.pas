@@ -3,7 +3,7 @@ unit ULoggerDemo;
 interface
 
 uses
-  Classes, SysUtils,    
+  Classes, SysUtils,
 {$IFNDEF MSWINDOWS}
   System.IOUtils,
 {$ENDIF}
@@ -179,7 +179,7 @@ end;
 
 procedure TLoggerDemo.ShowThreadsWrite;
 begin
- if FThreadsCount <> 0 then
+  if FThreadsCount <> 0 then
   begin
     DoStatus('Threads are still running now, please wait...');
     Exit;

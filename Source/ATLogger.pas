@@ -274,27 +274,27 @@ type
     { Methods}
     procedure T(const ATraceStr: string); overload;
     procedure T(const ATraceStr: string; const AArgs: array of const); overload;
-    procedure T(const ATraceStr: string; const AArgs: array of const; AFormatSettings: TFormatSettings); overload;
+    procedure T(const ATraceStr: string; const AArgs: array of const; const AFormatSettings: TFormatSettings); overload;
 
     procedure D(const ADebugStr: string); overload;
     procedure D(const ADebugStr: string; const AArgs: array of const); overload;
-    procedure D(const ADebugStr: string; const AArgs: array of const; AFormatSettings: TFormatSettings); overload;
+    procedure D(const ADebugStr: string; const AArgs: array of const; const AFormatSettings: TFormatSettings); overload;
 
     procedure I(const AInfoStr:  string); overload;
     procedure I(const AInfoStr:  string; const AArgs: array of const); overload;
-    procedure I(const AInfoStr:  string; const AArgs: array of const; AFormatSettings: TFormatSettings); overload;
+    procedure I(const AInfoStr:  string; const AArgs: array of const; const AFormatSettings: TFormatSettings); overload;
 
     procedure W(const AWarnStr:  string); overload;
     procedure W(const AWarnStr:  string; const AArgs: array of const); overload;
-    procedure W(const AWarnStr:  string; const AArgs: array of const; AFormatSettings: TFormatSettings); overload;
+    procedure W(const AWarnStr:  string; const AArgs: array of const; const AFormatSettings: TFormatSettings); overload;
 
     procedure E(const AErrorStr: string); overload;
     procedure E(const AErrorStr: string; const AArgs: array of const); overload;
-    procedure E(const AErrorStr: string; const AArgs: array of const; AFormatSettings: TFormatSettings); overload;
+    procedure E(const AErrorStr: string; const AArgs: array of const; const AFormatSettings: TFormatSettings); overload;
 
     procedure F(const AFatalStr: string); overload;
     procedure F(const AFatalStr: string; const AArgs: array of const); overload;
-    procedure F(const AFatalStr: string; const AArgs: array of const; AFormatSettings: TFormatSettings); overload;
+    procedure F(const AFatalStr: string; const AArgs: array of const; const AFormatSettings: TFormatSettings); overload;
     { Properties }
     property LogLevel: TATLogLevel read GetLogLevel write SetLogLevel;
     property Enabled: Boolean read GetEnabled write SetEnabled;
@@ -805,27 +805,27 @@ type
 
     procedure T(const ATraceStr: string); overload; {$IFDEF HAS_INLINE}inline;{$ENDIF}
     procedure T(const ATraceStr: string; const AArgs: array of const); overload;
-    procedure T(const ATraceStr: string; const AArgs: array of const; AFormatSettings: TFormatSettings); overload;
+    procedure T(const ATraceStr: string; const AArgs: array of const; const AFormatSettings: TFormatSettings); overload;
 
     procedure D(const ADebugStr: string); overload; {$IFDEF HAS_INLINE}inline;{$ENDIF}
     procedure D(const ADebugStr: string; const AArgs: array of const); overload;
-    procedure D(const ADebugStr: string; const AArgs: array of const; AFormatSettings: TFormatSettings); overload;
+    procedure D(const ADebugStr: string; const AArgs: array of const; const AFormatSettings: TFormatSettings); overload;
 
     procedure I(const AInfoStr: string); overload; {$IFDEF HAS_INLINE}inline;{$ENDIF}
     procedure I(const AInfoStr: string; const AArgs: array of const); overload;
-    procedure I(const AInfoStr: string; const AArgs: array of const; AFormatSettings: TFormatSettings); overload;
+    procedure I(const AInfoStr: string; const AArgs: array of const; const AFormatSettings: TFormatSettings); overload;
 
     procedure W(const AWarnStr: string); overload; {$IFDEF HAS_INLINE}inline;{$ENDIF}
     procedure W(const AWarnStr: string; const AArgs: array of const); overload;
-    procedure W(const AWarnStr: string; const AArgs: array of const; AFormatSettings: TFormatSettings); overload;
+    procedure W(const AWarnStr: string; const AArgs: array of const; const AFormatSettings: TFormatSettings); overload;
 
     procedure E(const AErrorStr: string); overload; {$IFDEF HAS_INLINE}inline;{$ENDIF}
     procedure E(const AErrorStr: string; const AArgs: array of const); overload;
-    procedure E(const AErrorStr: string; const AArgs: array of const; AFormatSettings: TFormatSettings); overload;
+    procedure E(const AErrorStr: string; const AArgs: array of const; const AFormatSettings: TFormatSettings); overload;
 
     procedure F(const AFatalStr: string); overload; {$IFDEF HAS_INLINE}inline;{$ENDIF}
     procedure F(const AFatalStr: string; const AArgs: array of const); overload;
-    procedure F(const AFatalStr: string; const AArgs: array of const; AFormatSettings: TFormatSettings); overload;
+    procedure F(const AFatalStr: string; const AArgs: array of const; const AFormatSettings: TFormatSettings); overload;
   public
     constructor Create(const AOutputter: IATLogOutputter; const ALevel: TATLogLevel = LOG_DEFAULT_LEVEL);
     destructor Destroy; override;
@@ -857,7 +857,7 @@ begin
 end;
 
 procedure TATLoggerContext.D(const ADebugStr: string;
-  const AArgs: array of const; AFormatSettings: TFormatSettings);
+  const AArgs: array of const; const AFormatSettings: TFormatSettings);
 begin
   D(Format(ADebugStr, AArgs, AFormatSettings));
 end;
@@ -899,13 +899,13 @@ begin
 end;
 
 procedure TATLoggerContext.E(const AErrorStr: string; const AArgs: array of const;
-  AFormatSettings: TFormatSettings);
+  const AFormatSettings: TFormatSettings);
 begin
   E(Format(AErrorStr, AArgs, AFormatSettings));
 end;
 
 procedure TATLoggerContext.F(const AFatalStr: string; const AArgs: array of const;
-  AFormatSettings: TFormatSettings);
+  const AFormatSettings: TFormatSettings);
 begin
   F(Format(AFatalStr, AArgs, AFormatSettings));
 end;
@@ -972,7 +972,7 @@ begin
 end;
 
 procedure TATLoggerContext.I(const AInfoStr: string; const AArgs: array of const;
-  AFormatSettings: TFormatSettings);
+  const AFormatSettings: TFormatSettings);
 begin
   I(Format(AInfoStr, AArgs, AFormatSettings));
 end;
@@ -1005,13 +1005,14 @@ begin
   FWaitforFinishedWhenTerminated := AValue;
 end;
 
-procedure TATLoggerContext.T(const ATraceStr: string; const AArgs: array of const; AFormatSettings: TFormatSettings);
+procedure TATLoggerContext.T(const ATraceStr: string; const AArgs: array of const;
+  const AFormatSettings: TFormatSettings);
 begin
   T(Format(ATraceStr, AArgs, AFormatSettings));
 end;
 
 procedure TATLoggerContext.W(const AWarnStr: string; const AArgs: array of const;
-  AFormatSettings: TFormatSettings);
+  const AFormatSettings: TFormatSettings);
 begin
   W(Format(AWarnStr, AArgs, AFormatSettings));
 end;

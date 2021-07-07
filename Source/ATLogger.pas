@@ -296,7 +296,9 @@ type
     procedure F(const AFatalStr: string; const AArgs: array of const); overload;
     procedure F(const AFatalStr: string; const AArgs: array of const; const AFormatSettings: TFormatSettings); overload;
     { Properties }
+    /// <summary> Log level value. </summary>
     property LogLevel: TATLogLevel read GetLogLevel write SetLogLevel;
+    /// <summary> Logs are no longer output if enabled is false. </summary>
     property Enabled: Boolean read GetEnabled write SetEnabled;
     /// <summary> Waitfor finished when logging terminated(default is true). </summary>
     property WaitforFinishedWhenTerminated: Boolean read GetWFWT write SetWFWT;

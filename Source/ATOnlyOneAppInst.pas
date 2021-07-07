@@ -123,14 +123,11 @@ begin
 end;
 
 function GenerateDefaultGlobalUniqueID: string;
-
-  function GetPureAppName: string;
-  begin
-    Result := ChangeFileExt(ExtractFileName(ParamStr(0)), '');
-  end;
-
+var
+  LPureAppName: string;
 begin
-  Result := Format('{1130D592-9727-417F-BB65-5C38FEA63B96}_ATOnlyOneAppInst_Def_%s', [GetPureAppName]);
+  LPureAppName := ChangeFileExt(ExtractFileName(ParamStr(0)), '');
+  Result := Format('{1130D592-9727-417F-BB65-5C38FEA63B96}_ATOnlyOneAppInst_Def_%s', [LPureAppName]);
 end;
 
 type
@@ -279,7 +276,7 @@ begin
       ProcessAppCallback(DWORD(AMsg.WParam), Integer(AMsg.LParam));
     except
       on E: Exception do
-        MessageBox(0, PChar(E.Message), nil, MB_OK + MB_ICONERROR + MB_TOPMOST);
+        MessageBox(0, PChar(E.Message), nil, MB_OK or MB_ICONERROR or MB_TOPMOST);
     end;
   end else
     AMsg.Result := DefWindowProc(FAppMsgHandle, AMsg.Msg, AMsg.WParam, AMsg.LParam);

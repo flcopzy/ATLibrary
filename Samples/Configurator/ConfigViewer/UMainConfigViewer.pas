@@ -233,7 +233,8 @@ end;
 procedure TFrmConfigViewer.ActionClearExecute(Sender: TObject);
 begin
   if (ListView.Items.Count > 0) and
-   (Application.MessageBox('Confirmed to clear all the configs?', 'ask', MB_YESNO + MB_ICONQUESTION) = IDYES) then
+   (Application.MessageBox('Confirmed to clear all the configs?', 'ask',
+     MB_YESNO or MB_ICONQUESTION) = IDYES) then
   begin
     FConfigurator.ClearAllConfigs;
     DoRefresh;

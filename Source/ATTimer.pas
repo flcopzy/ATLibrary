@@ -4,7 +4,7 @@
 {   ModuleName  :   ATTimer.pas                                               }
 {   Author      :   ZY                                                        }
 {   EMail       :   zylove619@hotmail.com                                     }
-{   Description :   Support a high-precision timer in MSWindos.               }
+{   Description :   Support a high-precision timer in MSWindows               }
 {                                                                             }
 { *************************************************************************** }
 
@@ -30,6 +30,11 @@
   
   Version 1.001 by ZY:
     (2016.06.18) + First version created.
+
+  Version 1.002 by ZY:
+    (2021.07.10) * fixed a compile error when use default
+                   TTimer on other platforms.
+
 *)
 
 unit ATTimer;
@@ -50,14 +55,14 @@ uses
   Windows, Messages, {$IFDEF HAS_UNIT_SCOPE}Vcl.Forms{$ELSE}Forms{$ENDIF}
   , SysUtils, Classes, MMSystem
 {$ELSE}
-  ExtCtrls
+  FMX.Types
 {$ENDIF};
 
 const
-  ATTimerVersion = '1.001';
+  ATTimerVersion = '1.002';
 
 {$IFDEF MSWINDOWS}  
-  ATTIMER_DEFAULT_INTERVAL = 1000;
+  ATTIMER_DEFAULT_INTERVAL = 1000 {ms};
 {$ENDIF}
 
 type
@@ -74,12 +79,11 @@ type
     FResolution  : UINT;
     FOnTimer: TNotifyEvent;
     FTimeBeginPeriodSuccessful: Boolean;
-    procedure SetEnabled(const Value: Boolean);
-    procedure SetInterval(Value: UINT);
-    procedure SetResolution(Value: UINT);
-    procedure SetOnTimer(const Value: TNotifyEvent);
-
-    procedure CheckMMResult(const ARoutine: string; AMMResult: MMRESULT);
+    procedure SetEnabled(const AValue: Boolean);
+    procedure SetInterval(AValue: UINT);
+    procedure SetResolution(AValue: UINT);
+    procedure SetOnTimer(const AValue: TNotifyEvent);
+    procedure CheckIfRaiseMMResult(const ARoutine: string; AMMResult: MMRESULT);
     procedure TimerWndProc(var AMsg: TMessage);
   protected
     procedure Timer; dynamic;
@@ -90,21 +94,22 @@ type
     constructor CreateNew(AOnTimer: TNotifyEvent; AInterval: UINT = ATTIMER_DEFAULT_INTERVAL;
       AEnabled: Boolean = True; AResolution: UINT = 0);
     destructor Destroy; override;
-    { System minimum period supported. }
+    /// <summary> System minimum period supported. </summary>
     property SysPeriodMin: UINT read FSysPeriodMin;
-    { System maximum period supported. }
+    /// <summary> System maximum period supported. </summary>
     property SysPeriodMax: UINT read FSysPeriodMax;
-    { Resolution of the timer event, in milliseconds. The resolution increases
-      with smaller values; a resolution of 0 indicates periodic events should
-      occur with the greatest possible accuracy. To reduce system overhead,
-      however, you should use the maximum value appropriate for your application. }
+    /// <summary> Resolution of the timer event, in milliseconds. The resolution increases
+    ///  with smaller values; a resolution of 0 indicates periodic events should
+    ///  occur with the greatest possible accuracy. To reduce system overhead,
+    ///  however, you should use the maximum value appropriate for your application.
+    /// </summary>
     property Resolution: UINT read FResolution write SetResolution;    
   published
-    { Controls whether the timer generates OnTimer events periodically. }
+    /// <summary> Controls whether the timer generates OnTimer events periodically. </summary>
     property Enabled: Boolean read FEnabled write SetEnabled default True; 
-    { Event delay, in milliseconds. }
+    /// <summary> Event delay, in milliseconds. </summary>
     property Interval: UINT read FInterval write SetInterval default ATTIMER_DEFAULT_INTERVAL;
-    { Occurs when a specified amount of time, determined by the Interval property, has passed. }
+    /// <summary> Occurs when a specified amount of time, determined by the Interval property, has passed. </summary>
     property OnTimer: TNotifyEvent read FOnTimer write SetOnTimer;
   end;
 {$ELSE}
@@ -116,10 +121,12 @@ implementation
 {$IFDEF MSWINDOWS}
 
 resourcestring
+
   sNoMultimediaTimers = 'Not enough multimedia timers available.';
   sCallProcFailed     = '%s call ''%s'' failed, error code: %u.';
 
 const
+
 {$IF not declared(TIME_KILL_SYNCHRONOUS)} { in MMSystem.pas }
   { This flag prevents the event from occurring
     after the user calls timeKillEvent() to destroy it.}
@@ -135,15 +142,20 @@ begin
   inherited;
 
   { Try query the timer device to determine its resolution. }
-  CheckMMResult('timeGetDevCaps', timeGetDevCaps(@LTimeCaps, SizeOf(LTimeCaps)));
+  CheckIfRaiseMMResult('timeGetDevCaps', timeGetDevCaps(@LTimeCaps, SizeOf(LTimeCaps)));
   FSysPeriodMin := LTimeCaps.wPeriodMin;
   FSysPeriodMax := LTimeCaps.wPeriodMax;
 
   { Try set the best period.
-    Note: It must match each call to timeBeginPeriod with a call
-          to timeEndPeriod, specifying the same minimum resolution
-          in both calls. }
-  CheckMMResult('timeBeginPeriod', timeBeginPeriod(FSysPeriodMin));
+    Note: 1. It must match each call to timeBeginPeriod with a call
+             to timeEndPeriod, specifying the same minimum resolution
+             in both calls.
+
+          2. Starting with Windows 10, version 2004, this function
+             no longer affects global timer resolution, see more:
+             https://docs.microsoft.com/en-us/windows/win32/api/timeapi/nf-timeapi-timebeginperiod
+  }
+  CheckIfRaiseMMResult('timeBeginPeriod', timeBeginPeriod(FSysPeriodMin));
   FTimeBeginPeriodSuccessful := True;
 
   { Set deault properties, same as TTimer. }
@@ -176,12 +188,13 @@ begin
   end;
 
   if FTimeBeginPeriodSuccessful then
-    CheckMMResult('timeEndPeriod', timeEndPeriod(FSysPeriodMin));
+    CheckIfRaiseMMResult('timeEndPeriod', timeEndPeriod(FSysPeriodMin));
 
   inherited;
 end;
 
 type
+
 {$IFDEF D2010AndUp}
   ATUIntPtr = DWORD_PTR;
 {$ELSE}
@@ -192,7 +205,7 @@ procedure InternalTimerCallback(uTimerID, uMessage: UINT;
   dwUser, dw1, dw2: ATUIntPtr) stdcall;
 begin
   { Note: 1. The callback is executed on a separate thread,
-             so do not access any VCL objects directly.
+             so do not access any VCL/FMX objects directly.
 
           2. Applications should not call any system-defined
              functions from inside a callback function, except
@@ -207,11 +220,11 @@ begin
   PostMessage(HWND(dwUser), WM_ATTIMER_MSGID, 0, 0);
 end;
 
-procedure TATTimer.SetEnabled(const Value: Boolean);
+procedure TATTimer.SetEnabled(const AValue: Boolean);
 begin
-  if FEnabled <> Value then
+  if FEnabled <> AValue then
   begin
-    FEnabled := Value;
+    FEnabled := AValue;
     UpdateTimer;
   end;
 end;
@@ -234,37 +247,37 @@ begin
     AMsg.Result := DefWindowProc(FMsgHandle, AMsg.Msg, AMsg.WParam, AMsg.LParam);
 end;
 
-procedure TATTimer.SetInterval(Value: UINT);
+procedure TATTimer.SetInterval(AValue: UINT);
 begin
-  if FInterval <> Value then
+  if FInterval <> AValue then
   begin
-    FInterval := Value;
+    FInterval := AValue;
     UpdateTimer;
   end;
 end;
 
-procedure TATTimer.SetResolution(Value: UINT);
+procedure TATTimer.SetResolution(AValue: UINT);
 begin
-  if Value > FSysPeriodMax then
-    Value := FSysPeriodMax;
+  if AValue > FSysPeriodMax then
+    AValue := FSysPeriodMax;
 
-  if FResolution <> Value then
+  if FResolution <> AValue then
   begin
-    FResolution := Value;
+    FResolution := AValue;
     UpdateTimer;
   end;
 end;
 
-procedure TATTimer.SetOnTimer(const Value: TNotifyEvent);
+procedure TATTimer.SetOnTimer(const AValue: TNotifyEvent);
 begin
-  if not CompareMem(@@FOnTimer, @@Value, SizeOf(TMethod)) then
+  if not CompareMem(@@FOnTimer, @@AValue, SizeOf(TMethod)) then
   begin
-    FOnTimer := Value;
+    FOnTimer := AValue;
     UpdateTimer;
   end;
 end;
 
-procedure TATTimer.CheckMMResult(const ARoutine: string;
+procedure TATTimer.CheckIfRaiseMMResult(const ARoutine: string;
   AMMResult: MMRESULT);
 begin
   if AMMResult <> TIMERR_NOERROR then
@@ -275,7 +288,7 @@ procedure TATTimer.KillTimer;
 begin
   if FTimerID <> 0 then
   begin
-    CheckMMResult('timeKillEvent', timeKillEvent(FTimerID));
+    CheckIfRaiseMMResult('timeKillEvent', timeKillEvent(FTimerID));
     FTimerID := 0;
   end;
 end;

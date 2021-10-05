@@ -70,6 +70,14 @@
   Version 1.007 by ZY:
     (2021.06.07) + Add db connection check to TATDBStorageProvider.
 
+  Version 1.008 by ZY:
+    (2021.10.05) * Ensure that the directory exists when change values
+                   to ini file for the first time.
+                 * Fix GetConfig can't get default group value if group
+                   name is empty.
+                 + Registry add access flags.
+                 * Fix registry always create key from HKEY_CURRENT_USER, when
+                   the input root key is not HKEY_CURRENT_USER.
 *)
 
 unit ATConfigurator;
@@ -106,8 +114,8 @@ interface
   {$IFDEF MSWINDOWS}
       { On Windows, we use ADO.
 
-        NOTE: if you want to build a 64-bit application, it may
-              be requires the 64-bit OLE driver. }
+        NOTE: if you want to build a 64-bit application, it must
+              requires the 64-bit OLE driver. }
     {$DEFINE USE_ADO}
   {$ELSE}
       { On other platform, we use FireDAC(installed since DXE4). }
@@ -125,10 +133,6 @@ interface
     {$DEFINE USE_SUPEROBJECT}
   {$ENDIF}
 {$ENDIF}
-
-{$IF Defined(MSWINDOWS) and (Defined(DB_SUPPORTED) or Defined(XML_SUPPORTED))}
-  {$DEFINE USE_WINOLE}
-{$IFEND}
 
 {$IF Defined(USE_ADO) and Defined(USE_WIDESTRING) and not Defined(HAS_WIDE_DB_ENHANCED)}
   {$DEFINE USE_WIDE_GETTABLENAMES}
@@ -153,7 +157,8 @@ uses
 {$ENDIF};
 
 const
-  ATConfiguratorVersion = '1.007';
+
+  ATConfiguratorVersion = '1.008';
 
 type
 
@@ -173,30 +178,36 @@ type
   TCFileStream = TFileStream;
 {$ENDIF}
 
+  /// <summary> Base storage provider. </summary>
 {$IFDEF USE_WIDESTRING}
   TATStorageProvider = TTntCustomIniFile
 {$ELSE}
   TATStorageProvider = TCustomIniFile
 {$ENDIF};
 
+  /// <summary> Operation access type. </summary>
   TATAccessType = (atRead, atWrite);
 
+  /// <summary> Current supported db type. </summary>
 {$IFDEF DB_SUPPORTED}
   TATDBType = (dtMSAccess, dtMSSql, dtMySql, dtSQLite);
 {$ENDIF}
 
-{$IFDEF HAS_ANONYMOUSMETHOD}  
+  /// <summary> Configs iterator ballback event. </summary>
+{$IFDEF HAS_ANONYMOUSMETHOD}
   TATConfigsIterator = reference to procedure(const AKey, AValue, AGroup: CString);
 {$ELSE}
   TATConfigsIterator = procedure(const AKey, AValue, AGroup: CString) of object;
 {$ENDIF}
 
+  /// <summary> Base value wrapper interface. </summary>
   IATValueWrapper = interface
   ['{9CD40A2E-2253-4728-AE00-5D59248DEC06}']
     function Wrap(const AOriginal: CString): CString;
     function UnWrap(const AWrapped: CString): CString;
   end;
 
+  /// <summary> Base encryption and decryption class. </summary>
   TATCrypt = class(TInterfacedObject, IATValueWrapper)
   private
     function IATValueWrapper.Wrap = Encrypt;
@@ -206,34 +217,81 @@ type
     function Decrypt(const ASrcString: CString): CString; virtual; abstract;    
   end;
 
+  /// <summary> Config interface for user. </summary>
   IATConfigurator = interface
     ['{B86595B0-0956-4B22-9DF9-915EF66653A5}']
     { Get and Set Operations }
-    function SetConfig(const AKey: CString; const AValue:    Variant; const AGroup: CString = ''; const ANeedWrap  : Boolean = False): IATConfigurator; overload;
+    /// <summary> Set a Key-Value to config. </summary>
+    /// <param name="AKey">The key of the config. </param>
+    /// <param name="AValue">The value of the config. </param>
+    /// <param name="AGroup">The group name (or section name) of the config. </param>
+    /// <param name="ANeedWrap"> The value will be wrapped when this param is true and ValueWrapper exists. </param>
+    /// <returns> Return IATConfigurator. </returns>
+    function SetConfig(const AKey: CString; const AValue: Variant; const AGroup: CString = ''; const ANeedWrap: Boolean = False): IATConfigurator; overload;
+    /// <summary> Get value from config. </summary>
+    /// <param name="AKey">The key name of the config. </param>
+    /// <param name="ADefValue">The default value of the config when the key not found. </param>
+    /// <param name="ANeedUnWrap"> The value will be unwrapped when this param is true and ValueWrapper exists. </param>
+    /// <returns> Return IATConfigurator. </returns>
     function GetConfig(const AKey: CString; const ADefValue: Variant; const AGroup: CString = ''; const ANeedUnWrap: Boolean = False): Variant; overload;
-    function SetConfig(const AKey: CString; const AValue:    TStream; const AGroup: CString = ''): IATConfigurator; overload;
-    function GetConfig(const AKey: CString; const AValue:    TStream; const AGroup: CString = ''): Integer; overload;
+    function SetConfig(const AKey: CString; const AValue: TStream; const AGroup: CString = ''): IATConfigurator; overload;
+    function GetConfig(const AKey: CString; const AValue: TStream; const AGroup: CString = ''): Integer; overload;
     function SetConfig(const AKeys: array of CString; const AValues: array of Variant; const AGroup: CString = ''): IATConfigurator; overload;
 
     { Group Operations }
+    /// <summary> Access a group. </summary>
+    /// <param name="AGroup">The group name, if it is empty, a "Default" group name will be used. </param>
+    /// <param name="AAccessType">Access type. </param>
+    /// <remarks>
+    ///   When in atRead mode, it will load all Key-Values from group to memory, so it's fast
+    ///   when read from the same group many times.
+    /// </remarks>
     function AccessGroup(const AGroup: CString = ''; AAccessType: TATAccessType = atRead): IATConfigurator;
-    procedure GetConfigGroups(Strings: TCStrings);
-    procedure GetConfigGroupValues(const AGroup: CString; AStrings: TCStrings);
+    /// <summary> Get all group names. </summary>
+    /// <param name="AGroupNames">The result group names. </param>
+    /// <remarks> All source data will be cleared before reading. </remarks>
+    procedure GetConfigGroups(AGroupNames: TCStrings);
+    /// <summary> Get all Key-Values from the group. </summary>
+    /// <param name="AGroup">The group name. </param>
+    /// <param name="AValues">The result Key-Values. </param>
+    /// <remarks> All source data will be cleared before reading. </remarks>
+    procedure GetConfigGroupValues(const AGroup: CString; AValues: TCStrings);
+    /// <summary> Iterate the config. </summary>
     procedure ConfigsIterator(AConfigsIterator: TATConfigsIterator);
+    /// <summary> Check if the group exists. </summary>
     function ConfigGroupExists(const AGroup: CString): Boolean;
+    /// <summary> Copy a group to another. </summary>
+    /// <param name="ASrcGroup">The group you want to copy from. </param>
+    /// <param name="ADestGroup">The group you want to copy to. </param>
+    /// <param name="ADestConfigurator">The dest group's parent. </param>
+    /// <remarks> The dest group will not be cleared before the copy. </remarks>
     function CopyGroup(const ASrcGroup: CString; const ADestGroup: CString; const ADestConfigurator: IATConfigurator = nil): Boolean;
 
     { Deletion Operations }
+    /// <summary> Delete a Key-Value from group by key. </summary>
     procedure DeleteConfig(const AKey: CString; const AGroup: CString = '');
+    /// <summary> Delete all Key-Values from the group. </summary>
     procedure DeleteGroup(const AGroup: CString);
+    /// <summary> Delete all Key-Values from the config. </summary>
     procedure ClearAllConfigs;
 
     { Persistent Operations }
+    /// <summary> Copy config from one to another. </summary>
+    /// <remarks> NOTE: It does not clear dest config before the copy. </remarks>
     function  CopyTo(const ADest: IATConfigurator): Boolean;
+    /// <summary> Save config to stream. </summary>
+    /// <remarks> NOTE: It is only support UTF8 currently. </remarks>
     procedure SaveToStream(AStream: TStream);
+    /// <summary> Save config to a file. </summary>
+    /// <remarks> NOTE: It is only support UTF8 currently. </remarks>
     procedure SaveToFile(const AFileName: CString);
+    /// <summary> Load config from stream. </summary>
+    /// <remarks> NOTE: It is only support UTF8 currently. </remarks>
     procedure LoadFromStream(AStream: TStream);
+    /// <summary> Load config from a file. </summary>
+    /// <remarks> NOTE: It is only support UTF8 currently. </remarks>
     procedure LoadFromFile(const AFileName: CString);
+    /// <summary> Copy config to clipbrd. </summary>
     procedure CopyToClipbrd;
 
     { Properties Methods}
@@ -248,20 +306,34 @@ type
     function GetConfigCountByGroup(const AGroup: CString): Integer;
 
     { Properties }
+    /// <summary> Get the storage provider object. </summary>
     property StorageProvider: TATStorageProvider read GetStorageProvider;
+    /// <summary> The value wrapper. </summary>
     property ValueWrapper: IATValueWrapper read GetValueWrapper write SetValueWrapper;
-    property StorageName  : CString read GetStorageName;
+    /// <summary> The storage name. </summary>
+    /// <remarks> Different storage providers may have different storage names, e.g. <para/>
+    ///           Ini/xml/json file: the full file name. <para/>
+    ///           Registry: the registry key you create.<para/>
+    ///           Memory config string: the file name is empty. <para/>
+    ///           DB: the connect string.
+    /// </remarks>
+    property StorageName: CString read GetStorageName;
+    /// <summary> Get the standard config text(the ini file format style). </summary>
     property StdConfigText: CString read GetStdConfigText;
-    property ConfigText   : CString read GetConfigText;
-    property GroupCount   : Integer read GetGroupCount;
-    property ConfigCount  : Integer read GetConfigCount;
+    /// <summary> Get respective config text. </summary>
+    /// <remarks> Note: The registry/DB config always has the ini file format style. </remarks>
+    property ConfigText: CString read GetConfigText;
+    /// <summary> The group count from the config. </summary>
+    property GroupCount: Integer read GetGroupCount;
+    /// <summary> The total Key-Values count from all groups from the config. </summary>
+    property ConfigCount: Integer read GetConfigCount;
   end;
 
 (* Useage:
 
-   Create a new Configurator.
+   Create new configurator.
 
-     * Create an ini file configuration.
+     * Create an ini file configurator.
 
       // Create an instance
       Configurator := NCIni('C:\MyConfig.ini');
@@ -281,7 +353,7 @@ type
       // Read a Key-Value
       Configurator.GetConfig('Key', 'DefaultValue', 'SectionName');
 
-      // Write to the same section
+      // Write to the same group
       with Configurator.AccessGroup('vars', atWrite) do
       begin
         SetConfig('VarBool' , False);
@@ -292,11 +364,12 @@ type
       end;
 
       // Or
-      Configurator.SetConfig(['VarBool', 'VarFloat', 'VarStr', 'VarInt'],
-        [False, 0.12, 'Hello Config', 123456], 'vars');
+      Configurator.SetConfig(['VarBool', 'VarFloat', 'VarStr',      'VarInt'],
+                               [False,     0.12,     'Hello Config', 123456],  'vars');
 
-      // Read the same section
-      with Configurator.AccessGroup('vars'{, atRead}) do
+      // Access group with atRead will load all group key-values into memory,
+      // so it will fast if you want to read many times from the same group.
+      with Configurator.AccessGroup('vars', atRead) do
       begin
         Bool  := GetConfig('VarBool' , False);
         Float := GetConfig('VarFloat', '0.00');
@@ -305,16 +378,16 @@ type
         ... 
       end;
 
-    * Create a registry configuration in Windows.
+    * Create a registry configurator on Windows.
 
-      // The default RootKey is HKEY_CURRENT_USER
+      // The default root key is HKEY_CURRENT_USER
       Configurator := NCReg('SoftWare\Configurator');
 
       // Set a Key-Value:
-      // SoftWare\Configurator\Group\ Key: Value
+      // SoftWare\Configurator\Group\Key: Value
       Configurator.SetConfig('Key', 'Value', 'Group');
 
-    * Create a xml configuration.
+    * Create a xml configurator.
 
       // If the filename is empty, you can get the xml string from the
       // Value property in StorageProvider.
@@ -331,7 +404,7 @@ type
       //       of the key(e.g. <3key><3key> is invalid), more info please
       //       see the XML documents.
 
-    * Create a json configuration.
+    * Create a json configurator.
 
       JSONConfig := NCJSON('C:\Configs.json');
       JSONConfig.SetConfig('Author', 'SteveMcConnell', 'CodeComplete');
@@ -342,7 +415,7 @@ type
       // NOTE:  More about special limited characters, please see the
       //        JSON documents.
 
-    * Create a string configuration.
+    * Create a string configurator.
 
       var
         LContents, LNewResult: CString;
@@ -357,9 +430,19 @@ type
         Configurator := NCIniStr(LContents);
         Configurator.SetConfig('Animal', 'Dog', 'Group4');
         LNewResult := Configurator.ConfigText;
+
+        The result:
+        [Group1]
+        Country=China
+        [Group2]
+        Day=Monday
+        [Group3]
+        Color=Red
+        [Group4]
+        Animal=Dog
       end;
 
-    * Create a DB configuration.
+    * Create a DB configurator.
 
       DBConfigurator := NCDB('..ConnectionString..', 'TableConfig', dtMSAccess);
 
@@ -401,7 +484,7 @@ type
       // NOTE: The configs will be cleared before the restore.
       Configurator.LoadFromFile('C:\SavedConfigs.data');
 
-    * Use a custom StorageProvider.
+    * Use a custom storage provider.
     
       type
         TMyStorageProvider = class(TATStorageProvider)
@@ -413,7 +496,7 @@ type
       
   { ***************************** IMPORTANT ******************************* }
   {                                                                         }
-  {  1.  Due to the StorageProvider's behavior(case-sensitive or not),      }
+  {  1.  Due to the storage provider behavior(case-sensitive or not),       }
   {      the result my be very different, giving the codes below:           }
   {                                                                         }
   {        SetConfig('Key', 'Value',  'Group');                             }
@@ -431,11 +514,16 @@ type
   {        IniString, XML, JSON                                             }
   {                                                                         }
   {      Without case-sensitive storage providers:                          }
-  {        Registry, DB                                                     }
+  {        Registry                                                         }
   {                                                                         }
-  {      Ini storage provider is special, in Windows(use WIN APIs) it is    }
+  {      DB depending on the platform and the databse config.               }
+  {                                                                         }
+  {      Ini storage provider is special, on Windows(use WIN APIs) it is    }
   {      not case-sensitive, otherwise, it is wraped from TMemIniFile       }
   {      which depending on the property "CaseSensitive".                   }
+  {                                                                         }
+  {      So the recommend is that always read and write according to        }
+  {      case sensitive rules.                                              }
   {                                                                         }
   {  2.  The default value and the result value should be compatibility.    }
   {                                                                         }
@@ -483,36 +571,80 @@ type
   {                                                                         }
   {      // StrVar:  MyString <== the quotation marks lost.                 }
   {                                                                         }
-  {  5.  ATConfigurator is not thread safe, plx use the synchronization     }
+  {  5.  ATConfigurator is not thread safe, so use the synchronization      }
   {      mechanism.                                                         }
   {                                                                         } 
   { *********************************************************************** }
 
 *)
+
+/// <summary> Create a configurator interface. </summary>
+/// <param name="AStorageProvider">The storage provider. </param>
 function NewConfigurator(AStorageProvider: TATStorageProvider): IATConfigurator;
 
+/// <summary> Create a ini file configurator. </summary>
+/// <param name="AFileName">The ini file name. </param>
+/// <remarks> 1. if file name is empty, a default name(current path with app name) will be used, e.g.: <para/>
+///      xxx\AppPath\AppName.ini <para/>
+///           2. When require unicode ini, it will create UTF-16 ini file if
+///              it not exists, if an ini file(ansi version) already exists,
+///              it still use original text format(ansi version) to read and
+///              write.
+/// </remarks>
 function NCIni(const AFileName: CString = ''): IATConfigurator;
+/// <summary> Create a memory ini string configurator. </summary>
+/// <param name="AIniStr">The initialization string. </param>
 function NCIniStr(const AIniStr: CString = ''): IATConfigurator;
 
 {$IF Defined(MSWINDOWS) and Defined(REGISTRY_SUPPORTED)}
-function NCReg(const ARegKey: CString = ''; ARootKey: HKEY = HKEY_CURRENT_USER): IATConfigurator;
+/// <summary> Create a Windows registry configurator. </summary>
+/// <param name="ARegKey">The key path. </param>
+/// <param name="ARootKey">The root. </param>
+/// <param name="AAccess">Access flags. </param>
+/// <remarks> When ARegKey is empty. a default key will be used, e.g.: <para/>
+///      Software\AppName\Configs
+/// </remarks>
+function NCReg(const ARegKey: CString = ''; ARootKey: HKEY = HKEY_CURRENT_USER; AAccess: LongWord = KEY_ALL_ACCESS): IATConfigurator;
 {$IFEND}
 
 {$IFDEF XML_SUPPORTED}
+/// <summary> Create a XML configurator. </summary>
+/// <param name="AFileName">The xml file name. </param>
+/// <remarks> if file name is empty, a default name(current path with app name) will be used, e.g.: <para/>
+///      xxx\AppPath\AppName.xml
+/// </remarks>
 function NCXML(const AFileName: CString = ''): IATConfigurator;
+/// <summary> Create a memory xml string configurator. </summary>
+/// <param name="AIniStr">The initialization string. </param>
 function NCXMLStr(const AXMLStr: CString = ''): IATConfigurator;
 {$ENDIF}
 
 {$IFDEF JSON_SUPPORTED}
+/// <summary> Create a JSON configurator. </summary>
+/// <param name="AFileName">The json file name. </param>
+/// <remarks> if file name is empty, a default name(current path with app name) will be used, e.g.: <para/>
+///      xxx\AppPath\AppName.json
+/// </remarks>
 function NCJSON(const AFileName: CString = ''): IATConfigurator;
+/// <summary> Create a memory json string configurator. </summary>
+/// <param name="AIniStr">The initialization string. </param>
 function NCJSONStr(const AJSONStr: CString = ''): IATConfigurator;
 {$ENDIF}
 
 {$IFDEF DB_SUPPORTED}
+/// <summary> Create a DB configurator. </summary>
+/// <param name="AConnectionString">The connection string. </param>
+/// <param name="ADBType">Database type. </param>
+/// <param name="AConfigTableName">Table for storing config. </param>
 function NCDB(const AConnectionString: CString{$IFDEF USE_ADO}; ADBType: TATDBType{$ENDIF}; const AConfigTableName: CString = ''): IATConfigurator; overload;
+/// <summary> Create a DB configurator. </summary>
+/// <param name="ADBType">Database type. </param>
+/// <param name="ASharedConnection">The exists connection object. </param>
+/// <param name="AConfigTableName">Table for storing config. </param>
 function NCDB({$IFDEF USE_ADO}ADBType: TATDBType;{$ENDIF}ASharedConnection: TCustomConnection; const AConfigTableName: CString = ''): IATConfigurator; overload;
 {$ENDIF}
 
+/// <summary> Create a default crypt. </summary>
 function NewDefaultCrypt: TATCrypt;
 
 implementation
@@ -648,9 +780,9 @@ function CQuoTedStr(const S: CString): CString;
 begin
   Result :=
   {$IFDEF USE_WIDESTRING}
-   WideQuotedStr(S, '''')
+    WideQuotedStr(S, '''')
   {$ELSE}
-   AnsiQuotedStr(S, '''')
+    AnsiQuotedStr(S, '''')
   {$ENDIF};
 end;
 
@@ -662,6 +794,36 @@ begin
   {$ELSE}
     IncludeTrailingPathDelimiter(S);
   {$ENDIF};
+end;
+
+function CExtractFilePath(const AFileName: CString): CString;
+begin
+  Result :=
+  {$IFDEF USE_WIDESTRING}
+    TntSysUtils.WideExtractFilePath(AFileName);
+  {$ELSE}
+    ExtractFilePath(AFileName);
+  {$ENDIF}; 
+end;
+
+function CDirectoryExists(const ADirectory: CString): Boolean;
+begin
+  Result :=
+  {$IFDEF USE_WIDESTRING}
+    TntSysUtils.WideDirectoryExists(ADirectory);
+  {$ELSE}
+    DirectoryExists(ADirectory);
+  {$ENDIF}; 
+end;
+
+function CForceDirectories(const ADirectory: CString): Boolean;
+begin
+  Result :=
+  {$IFDEF USE_WIDESTRING}
+    TntSysUtils.WideForceDirectories(ADirectory);
+  {$ELSE}
+    ForceDirectories(ADirectory);
+  {$ENDIF}; 
 end;
 
 {$IFDEF MSWINDOWS}
@@ -913,30 +1075,50 @@ type
 
 { TATIniFileStorageProvider }
 
+{$IF Defined(MSWINDOWS) and (Defined(USE_WIDESTRING) or Defined(UNICODE))}
+  {$DEFINE REQUIRE_WIDE_INI_WINAPI}
+{$IFEND}
+
 constructor TATIniFileStorageProvider.Create(const FileName: CString);
-{$IF Defined(MSWINDOWS) and (Defined(USE_WIDESTRING) or Defined(UNICODE))}
-const
-  UTF16_LE_BOM: array[0..1] of Byte = ($FF, $FE);
+
+  procedure CreateUTF16LeFile(const ANewFileName: CString);
+  const
+    CUTF16_LE_BOM: array[0..1] of Byte = ($FF, $FE);
+  var
+    LFile: TCFileStream;
+  begin
+    { NOTE: On Windows, the unicode version WritePrivateProfileStringW only
+            supports UTF-16, so we must create it manually if it not exists.
+            see this article:
+            http://www.codeproject.com/Articles/9071/Using-Unicode-in-INI-files }
+    LFile := TCFileStream.Create(ANewFileName, fmCreate or fmShareExclusive);
+    try
+      LFile.Write(CUTF16_LE_BOM, SizeOf(CUTF16_LE_BOM));
+    finally
+      LFile.Free;
+    end;
+  end;
+
+{$IFDEF MSWINDOWS}
 var
-  LFile: TCFileStream;
-{$IFEND}  
+  LFilePath: CString;
+{$ENDIF}
 begin
-  inherited;
-{$IF Defined(MSWINDOWS) and (Defined(USE_WIDESTRING) or Defined(UNICODE))}
+  inherited Create(FileName);
+
+{$IFDEF MSWINDOWS}
+  { When use WinApi to set value, it will raise exception if the
+    file path not exists, so make sure the path exists. }
+  LFilePath := CExtractFilePath(FileName);
+  if not CDirectoryExists(LFilePath) then
+    CForceDirectories(LFilePath);
+{$ENDIF}
+
+{$IFDEF REQUIRE_WIDE_INI_WINAPI}
   if CFileExists(FileName) or Self.InheritsFrom(TMemIniFile) then
     Exit;
-
-  { NOTE: In WINDOWS, the Unicode version WritePrivateProfileStringW only
-          supports UTF-16, so we must create it manually if it not exists.
-          see this article:
-          http://www.codeproject.com/Articles/9071/Using-Unicode-in-INI-files }
-  LFile := TCFileStream.Create(FileName, fmCreate or fmShareExclusive);
-  try
-    LFile.Write(UTF16_LE_BOM, SizeOf(UTF16_LE_BOM));
-  finally
-    LFile.Free;
-  end;
-{$IFEND}
+  CreateUTF16LeFile(FileName);
+{$ENDIF}
 end;
 
 procedure CheckIfNeedRaise(ACondition: Boolean; AEClass: EConfiguratorExceptionClass; AHandledObject: TObject;
@@ -987,17 +1169,17 @@ type
   TATRegistryStorageProvider = class(TWideRegistryIniFile)
   {$ELSE}
   TATRegistryStorageProvider = class(TRegistryIniFile)
-  {$ENDIF}
+  {$ENDIF USE_WIDESTRING}
   public
-    constructor Create(const AFileName: CString; ARootKey: HKEY); overload;
+    constructor Create(const AFileName: CString; ARootKey: HKEY; AAccess: LongWord);
     procedure ReadSectionValues(const Section: CString; Strings: TCStrings); override;
   end;
 
-function NCReg(const ARegKey: CString; ARootKey: HKEY): IATConfigurator;
+function NCReg(const ARegKey: CString; ARootKey: HKEY; AAccess: LongWord): IATConfigurator;
 
   function GetDefaultRegRootKey: CString;
   begin
-    //e.g.: "Software\MyApp\Configs"
+    // e.g.: "Software\AppName\Configs"
     Result := 'Software' + PathDelim + GetAppName + PathDelim + DEFAULT_CONFIGNAME;
   end;
 
@@ -1006,7 +1188,7 @@ var
 begin
   LRegKey := Trim(ARegKey);
   LRegKey := IfThen(LRegKey = '', GetDefaultRegRootKey, LRegKey);
-  Result := NewConfigurator(TATRegistryStorageProvider.Create(LRegKey, ARootKey));
+  Result := NewConfigurator(TATRegistryStorageProvider.Create(LRegKey, ARootKey, AAccess));
 end;
 
 {$IFDEF USE_WIDESTRING}
@@ -1203,15 +1385,20 @@ end;
 { TATRegistryStorageProvider }
 
 constructor TATRegistryStorageProvider.Create(const AFileName: CString;
-  ARootKey: HKEY);
+  ARootKey: HKEY; AAccess: LongWord);
 begin
-  Create(AFileName);
-  if ARootKey <> HKEY_CURRENT_USER then
+  { NOTE: TRegIniFile always auto create key with default root
+          key(HKEY_CURRENT_USER) on create event whatever the input
+          root key is, so if the input root key is not default, we
+          pass empty key to avoid the auto creating, after that we
+          create the key manually. }
+  if ARootKey = HKEY_CURRENT_USER then
+    inherited Create(AFileName, AAccess)
+  else
   begin
-    { Recreate rootkey if it is not the default.
-      NOTE£º the default rootkey will still be created. }
+    inherited Create('', AAccess);
     RegIniFile.RootKey := ARootKey;
-    RegIniFile.OpenKey(FileName, True);
+    RegIniFile.OpenKey(AFileName, True);
   end;
 end;
 
@@ -2958,7 +3145,7 @@ end;
 type
   TATConfigurator = class(TInterfacedObject, IATConfigurator)
   private
-    FGroupStringList: TCStringList;
+    FGroupList: TATGroupStringList;
     FStorageProvider: TATStorageProvider;
     FValueWrapper: IATValueWrapper;
     procedure SetStringValue(const AKey, AValue, AGroup: CString);
@@ -2981,8 +3168,8 @@ type
     function SetConfig(const AKeys: array of CString; const AValues: array of Variant; const AGroup: CString = ''): IATConfigurator; overload;
 
     function AccessGroup(const AGroup: CString = ''; AAccessType: TATAccessType = atRead): IATConfigurator;
-    procedure GetConfigGroups(Strings: TCStrings);
-    procedure GetConfigGroupValues(const AGroup: CString; AStrings: TCStrings);
+    procedure GetConfigGroups(AGroupNames: TCStrings);
+    procedure GetConfigGroupValues(const AGroup: CString; AValues: TCStrings);
     procedure ConfigsIterator(AConfigsIterator: TATConfigsIterator);
     function ConfigGroupExists(const AGroup: CString): Boolean;
     function CopyGroup(const ASrcGroup: CString; const ADestGroup: CString; const ADestConfigurator: IATConfigurator = nil): Boolean;
@@ -3022,12 +3209,12 @@ end;
 
 function TATConfigurator.AccessGroup(const AGroup: CString; AAccessType: TATAccessType): IATConfigurator;
 begin
-  TATGroupStringList(FGroupStringList).Group := AGroup;
+  FGroupList.Group := AGroup;
 
   if AAccessType = atRead then
   begin
     { Read all items to buffer list }
-    GetConfigGroupValues(GetCurrentGroup(AGroup), FGroupStringList);
+    GetConfigGroupValues(GetCurrentGroup(AGroup), FGroupList);
   end else
   begin
     { Write immediately, buffer list current not supported. }
@@ -3112,13 +3299,13 @@ begin
   inherited Create;
   SetStorageProvider(AStorageProvider);
   FValueWrapper    := NewDefaultCrypt;
-  FGroupStringList := TATGroupStringList.Create;
+  FGroupList := TATGroupStringList.Create;
 end;
 
 destructor TATConfigurator.Destroy;
 begin
   FStorageProvider.Free;
-  FGroupStringList.Free;
+  FGroupList.Free;
   FValueWrapper := nil;
   inherited;
 end;
@@ -3178,19 +3365,20 @@ function TATConfigurator.GetConfig(const AKey: CString; const ADefValue: Variant
 var
   LIndex: Integer;
   LResultStr, LKey, LGroup: CString;
+  LNeedSearchFromBuffer: Boolean;
 begin
-
   Result := ADefValue;
 
   LKey   := Trim(AKey);
   LGroup := Trim(AGroup);
 
-  if LGroup = '' then
+  LNeedSearchFromBuffer := LGroup = '';
+  if LNeedSearchFromBuffer then
   begin
     { Search from the buffer list }
-    LIndex := FGroupStringList.IndexOfName(LKey);
-    if LIndex > - 1 then
-      LResultStr := FGroupStringList.ValueFromIndex[LIndex]
+    LIndex := FGroupList.IndexOfName(LKey);
+    if LIndex >= 0 then
+      LResultStr := FGroupList.ValueFromIndex[LIndex]
     else
       Exit;
   end else
@@ -3213,9 +3401,11 @@ function TATConfigurator.GetCurrentGroup(const AParamGroup: CString): CString;
 begin
   Result := Trim(AParamGroup);
   if Result = '' then
-    Result := TATGroupStringList(FGroupStringList).Group;
-  if Result = '' then
-    Result := DEFAULT_GROUPNAME;
+  begin
+    Result := FGroupList.Group;
+    if Result = '' then
+      Result := DEFAULT_GROUPNAME;
+  end;
 end;
 
 function TATConfigurator.GetGroupCount: Integer;
@@ -3265,7 +3455,7 @@ function TATConfigurator.GetConfigText: CString;
 const
   PropConfigText = 'ConfigText';
 var
-  LStrProp: PPropInfo;  
+  LStrProp: PPropInfo;
 begin
   LStrProp := GetPropInfo(FStorageProvider, PropConfigText);
   if not Assigned(LStrProp) then
@@ -3415,15 +3605,14 @@ begin
   end;
 end;
 
-procedure TATConfigurator.GetConfigGroups(Strings: TCStrings);
+procedure TATConfigurator.GetConfigGroups(AGroupNames: TCStrings);
 begin
-  FStorageProvider.ReadSections(Strings);
+  FStorageProvider.ReadSections(AGroupNames);
 end;
 
-procedure TATConfigurator.GetConfigGroupValues(const AGroup: CString;
-  AStrings: TCStrings);
+procedure TATConfigurator.GetConfigGroupValues(const AGroup: CString; AValues: TCStrings);
 begin
-  FStorageProvider.ReadSectionValues(AGroup, AStrings);
+  FStorageProvider.ReadSectionValues(AGroup, AValues);
 end;
 
 procedure TATConfigurator.SaveToFile(const AFileName: CString);
@@ -3639,11 +3828,6 @@ begin
   Result := NewConfigurator(TATStringStorageProvider.Create(Trim(AIniStr)));
 end;
 
-{$IFDEF USE_WINOLE}
-var
-  CoInitResult: HRESULT = -1;
-{$ENDIF}
-
 initialization;
 
 {$IF Defined(MSWINDOWS) and Defined(USE_WIDESTRING)}
@@ -3651,18 +3835,6 @@ initialization;
     will be Unicode-enabled. }
   InstallTntSystemUpdates([tsWideResourceStrings]);
 {$IFEND}
-
-{$IFDEF USE_WINOLE}
-  if IsLibrary then
-    CoInitResult := CoInitialize(nil);
-{$ENDIF}
-  
-finalization
-
-{$IFDEF USE_WINOLE}
-  if (CoInitResult = S_OK) and IsLibrary then
-    CoUninitialize;
-{$ENDIF}
 
 end.
 

@@ -84,10 +84,6 @@ type
     PCConfig: TPageControl;
     TSTable: TTabSheet;
     ListView: TListView;
-    TSStdText: TTabSheet;
-    MStd: TMemo;
-    TabSheet1: TTabSheet;
-    MConfig: TMemo;
     ActionReload: TAction;
     MIReload: TMenuItem;
     ActionClear: TAction;
@@ -96,6 +92,12 @@ type
     Button1: TButton;
     ActionSubmit: TAction;
     ActionCreateConfigurator: TAction;
+    PanelDetailViews: TPanel;
+    Splitter1: TSplitter;
+    GroupBoxStdConfigView: TGroupBox;
+    GroupBoxConfigTextView: TGroupBox;
+    MStd: TMemo;
+    MConfig: TMemo;
     procedure FormCreate(Sender: TObject);
     procedure RBAddClick(Sender: TObject);
     procedure ListViewKeyDown(Sender: TObject; var Key: Word;
@@ -115,6 +117,7 @@ type
     procedure ActionSubmitExecute(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure ActionCreateConfiguratorExecute(Sender: TObject);
+    procedure PanelDetailViewsResize(Sender: TObject);
     procedure PanelViewClick(Sender: TObject);
   private
     { Private declarations }
@@ -493,6 +496,11 @@ begin
     FreeMem(LPFileName);
     DragFinish(LhDrop);
   end;
+end;
+
+procedure TFrmConfigViewer.PanelDetailViewsResize(Sender: TObject);
+begin
+  GroupBoxStdConfigView.Width := GroupBoxStdConfigView.Parent.ClientWidth div 2;
 end;
 
 procedure TFrmConfigViewer.PanelViewClick(Sender: TObject);

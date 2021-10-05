@@ -317,11 +317,21 @@ object FrmConfigViewer: TFrmConfigViewer
         TabOrder = 0
         object TSTable: TTabSheet
           Caption = 'Table View'
+          object Splitter1: TSplitter
+            Left = 0
+            Top = 225
+            Width = 527
+            Height = 3
+            Cursor = crVSplit
+            Align = alBottom
+            ExplicitTop = 0
+            ExplicitWidth = 288
+          end
           object ListView: TListView
             Left = 0
             Top = 0
             Width = 527
-            Height = 386
+            Height = 225
             Align = alClient
             BevelInner = bvNone
             BevelOuter = bvNone
@@ -351,37 +361,57 @@ object FrmConfigViewer: TFrmConfigViewer
             OnKeyDown = ListViewKeyDown
             OnSelectItem = ListViewSelectItem
           end
-        end
-        object TSStdText: TTabSheet
-          Caption = 'Std Config View'
-          ImageIndex = 1
-          object MStd: TMemo
+          object PanelDetailViews: TPanel
             Left = 0
-            Top = 0
+            Top = 228
             Width = 527
-            Height = 386
-            Align = alClient
-            BorderStyle = bsNone
-            ImeName = #20013#25991'('#31616#20307') - '#25628#29399#25340#38899#36755#20837#27861
-            ReadOnly = True
-            ScrollBars = ssBoth
-            TabOrder = 0
-          end
-        end
-        object TabSheet1: TTabSheet
-          Caption = 'Config Text View'
-          ImageIndex = 2
-          object MConfig: TMemo
-            Left = 0
-            Top = 0
-            Width = 527
-            Height = 386
-            Align = alClient
-            BorderStyle = bsNone
-            ImeName = #20013#25991'('#31616#20307') - '#25628#29399#25340#38899#36755#20837#27861
-            ReadOnly = True
-            ScrollBars = ssBoth
-            TabOrder = 0
+            Height = 158
+            Align = alBottom
+            BevelOuter = bvNone
+            TabOrder = 1
+            OnResize = PanelDetailViewsResize
+            object GroupBoxStdConfigView: TGroupBox
+              Left = 0
+              Top = 0
+              Width = 273
+              Height = 158
+              Align = alLeft
+              Caption = 'Std Config View'
+              TabOrder = 0
+              object MStd: TMemo
+                Left = 2
+                Top = 16
+                Width = 269
+                Height = 140
+                Align = alClient
+                BorderStyle = bsNone
+                ImeName = #20013#25991'('#31616#20307') - '#25628#29399#25340#38899#36755#20837#27861
+                ReadOnly = True
+                ScrollBars = ssBoth
+                TabOrder = 0
+              end
+            end
+            object GroupBoxConfigTextView: TGroupBox
+              Left = 273
+              Top = 0
+              Width = 254
+              Height = 158
+              Align = alClient
+              Caption = 'Config Text View'
+              TabOrder = 1
+              object MConfig: TMemo
+                Left = 2
+                Top = 16
+                Width = 250
+                Height = 140
+                Align = alClient
+                BorderStyle = bsNone
+                ImeName = #20013#25991'('#31616#20307') - '#25628#29399#25340#38899#36755#20837#27861
+                ReadOnly = True
+                ScrollBars = ssBoth
+                TabOrder = 0
+              end
+            end
           end
         end
       end

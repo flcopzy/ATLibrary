@@ -3372,7 +3372,9 @@ begin
   LKey   := Trim(AKey);
   LGroup := Trim(AGroup);
 
-  LNeedSearchFromBuffer := LGroup = '';
+  { if group is empty and has already access the group, then we
+    search from the buffer list. }
+  LNeedSearchFromBuffer := (LGroup = '') and (FGroupList.Group <> '');
   if LNeedSearchFromBuffer then
   begin
     { Search from the buffer list }
@@ -3383,10 +3385,13 @@ begin
       Exit;
   end else
   begin
+    { if group is empty, we get the defualt name. }
+    if LGroup = '' then
+      LGroup := GetCurrentGroup(LGroup);
+
     { Search from the storage provider }
     if FStorageProvider.ValueExists(LGroup, LKey) then
-      LResultStr := FStorageProvider.ReadString(LGroup, LKey,
-                    GetVariantStr(ADefValue))
+      LResultStr := FStorageProvider.ReadString(LGroup, LKey, GetVariantStr(ADefValue))
     else
       Exit;
   end;

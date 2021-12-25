@@ -78,6 +78,8 @@
                  + Registry add access flags.
                  * Fix registry always create key from HKEY_CURRENT_USER, when
                    the input root key is not HKEY_CURRENT_USER.
+
+    (2021.12.25) * Change dynamic array absolute type to raw pointer array type.
 *)
 
 unit ATConfigurator;
@@ -944,7 +946,7 @@ function TextFromStream(const AStream: TStream): CString;
 {$IFNDEF UNICODE}
 var
   LUtf8Text: UTF8String;
-  LUft8Bom: TUtf8Bom;
+  LUtf8Bom: TUtf8Bom;
   LSize: Integer;
 {$ENDIF}
 begin
@@ -965,8 +967,8 @@ begin
   LSize := AStream.Size;
   if LSize >= CUTF8_BOM_SIZE then
   begin
-    AStream.ReadBuffer(LUft8Bom, CUTF8_BOM_SIZE);
-    if CompareMem(@LUft8Bom, @CUTF8_BOM, CUTF8_BOM_SIZE) then
+    AStream.ReadBuffer(LUtf8Bom, CUTF8_BOM_SIZE);
+    if CompareMem(@LUtf8Bom, @CUTF8_BOM, CUTF8_BOM_SIZE) then
       Dec(LSize, CUTF8_BOM_SIZE)
     else
     { Utf8 BOM not found }
@@ -3726,12 +3728,14 @@ begin
   FKey := 30609;
 end;
 
-{$IFNDEF HAS_TBYTES}
 type
+{$IFNDEF HAS_TBYTES}
   TBytes = array of Byte;
 {$ENDIF ~HAS_TBYTES}
 
-type
+  PBytesArr = ^TBytesArr;
+  TBytesArr = array[0..High(Integer) - 1] of Byte;
+
   RawUTF8 = {$IFDEF UNICODE}
               {$IFDEF NEXTGEN}
                 { Delphi's NextGen compiler (Android, IOS) removed support for UTF8String,
@@ -3749,7 +3753,7 @@ var
   I, LTempKey: Integer;
   LKey: Word;
   LStr: RawUTF8;
-  LStrByte: TBytes absolute LStr;
+  LStrByte: PBytesArr absolute LStr;
   LTempStr: CString;
 begin
   LTempStr := UpperCase(ASrcString);
@@ -3793,7 +3797,7 @@ var
   I: Integer;
   LKey: Word;
   LWStr: RawUTF8;
-  LStrByte: TBytes absolute LWStr;
+  LStrByte: PBytesArr absolute LWStr;
 begin
   Result := '';
 {$IFDEF NEXTGEN}

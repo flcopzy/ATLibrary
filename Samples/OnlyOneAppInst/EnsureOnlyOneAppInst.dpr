@@ -21,17 +21,31 @@ begin
     FormOOAIMain.AddLog('App is already running, new param: ' + ANextParam);
 end;
 
+procedure MyOnAppCheck(IsAppRunning: Boolean; var ANeedNotify: Boolean);
+begin
+  if IsAppRunning then
+  begin
+    { Notify the first application or not. }
+    ANeedNotify := True;
+
+    { If possible, you can do more initializations here,
+      e.g. write more information to your shared memory
+      to communication with the first application.
+    }
+  end;
+end;
+
 begin
   ReportMemoryLeaksOnShutdown := True;
 
   Application.Initialize;
 
-  { 1. Use deault unique id and empty callback event. }
+  { 1. Use default unique id and empty events. }
 //  if OnlyOneAppInst.IsAppRunning then
 //    Exit;
 
   { 2. Use your own unique id and callback event. }
-  if OnlyOneAppInst(CAppGlobalUniqueID, MyOnAppCall).IsAppRunning then
+  if OnlyOneAppInst(CAppGlobalUniqueID, MyOnAppCall, MyOnAppCheck).IsAppRunning then
     Exit;
 
   { 3. Use anonymous method. }

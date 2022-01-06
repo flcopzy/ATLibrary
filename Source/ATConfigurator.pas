@@ -507,7 +507,7 @@ type
   {      In case-sensitive:                                                 }
   {        will add two config items.                                       }
   {      In without case-sensitive:                                         }
-  {        only add one config item, in other words, the first'             }
+  {        only add one config item, in other words, the first              }
   {        value will be changed to "Value2".                               }
   {                                                                         }
   {      and this will also have an impact to the persistent operations.    }
@@ -518,7 +518,7 @@ type
   {      Without case-sensitive storage providers:                          }
   {        Registry                                                         }
   {                                                                         }
-  {      DB depending on the platform and the databse config.               }
+  {      DB depending on the platform or the database config.               }
   {                                                                         }
   {      Ini storage provider is special, on Windows(use WIN APIs) it is    }
   {      not case-sensitive, otherwise, it is wraped from TMemIniFile       }
@@ -575,9 +575,32 @@ type
   {                                                                         }
   {  5.  ATConfigurator is not thread safe, so use the synchronization      }
   {      mechanism.                                                         }
-  {                                                                         } 
+  {                                                                         }
   { *********************************************************************** }
 
+  { *CURRENT LIMITATION*
+       ATConfigurator currently only supports no-typed value(string based),
+     because some config format already contains type information and others
+     may not.
+
+     for example in ini file:
+     [Main]
+     Value=2
+     Is "Value" a string type or a numerical type? we don't know until you use
+     the function ReadString(considered to be string type), or ReadInteger
+     (considered to be integer type).
+
+     some other formats, for example in json file
+     {"Value":"2"}
+     it clearly that the "Value" a string type.
+
+     the registry format has type information too, but XML format and DB format dont
+     have type information by default.
+
+     Due to these reasons, supports typed value must add additional type information
+     to the file which dont contains type information by deault, this feature may be
+     added in the future.
+  }
 *)
 
 /// <summary> Create a configurator interface. </summary>

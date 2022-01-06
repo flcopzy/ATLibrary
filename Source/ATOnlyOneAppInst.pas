@@ -4,7 +4,7 @@
 {   ModuleName  :   ATOnlyOneAppInst.pas                                      }
 {   Author      :   ZY                                                        }
 {   EMail       :   zylove619@hotmail.com                                     }
-{   Description :   Ensure only a single instance of the application runs.    }
+{   Description :   Ensure only one single instance of the application runs.  }
 {                                                                             }
 { *************************************************************************** }
 
@@ -299,6 +299,7 @@ begin
     DebugOutput('Mutex %u Closed successful.', [FAppMutex]);
     FAppMutex := 0;
   end;
+
   inherited;
 end;
 
@@ -367,7 +368,7 @@ begin
     { Param exists, we use "SendMessageTimeout" instead of "BroadcastSystemMessage",
       because it seems not support sync call. }
 
-    { Make a mempry file mapping name from the process id. }
+    { Make a mem file mapping name from the process id. }
     LCurrentProcessId := GetCurrentProcessId;
     LMemFileMappingName := GetGlobalMemFileMappingName(LCurrentProcessId);
 
@@ -408,7 +409,7 @@ begin
           SMTO_ABORTIFHUNG: The function returns without waiting for the time-out
                             period to elapse if the receiving thread appears to not
                             respond or "hangs."
-          Note: After my test, if use other fuFlags(SMTO_BLOCK, SMTO_NORMAL...), the
+          Note: After testing, if use other fuFlags(SMTO_BLOCK, SMTO_NORMAL...), the
                 first app may receive message very lag under certain conditions,
                 one case: TADOConnection created in a thread context(COM has been initialized).
         }
@@ -488,7 +489,7 @@ function TATWinOnlyOneAppInst.StrToBytes(const AStr: string): TBytes;
 var
   LWideStr: {$IFDEF UNICODE}string{$ELSE}WideString{$ENDIF};
 begin
-  { On windows, use default wide string. }
+  { On Windows, use default wide string. }
   LWideStr := AStr;
   SetLength(Result, Length(LWideStr) * SizeOf(LWideStr[1]));
   if Length(Result) <> 0 then

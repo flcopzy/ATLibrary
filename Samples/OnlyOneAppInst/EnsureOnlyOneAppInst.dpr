@@ -10,28 +10,46 @@ uses
 const
   CAppGlobalUniqueID = '{F1FB2123-DD15-44DF-B03B-9D724467AA34}_OnlyOneAppInst_Demo';
 
-procedure MyOnAppCall(ANextPID: UInt64; const ANextParam: string);
+procedure MyOnAppCall(ANextPID: UInt64; const ANextParam: ATOOAIParamString);
 begin
+  { NOTE: This proc executed only in the first app context. }
+
   if FormOOAIMain = nil then
     Exit;
 
   if ANextPID = 0 then
     FormOOAIMain.AddLog('App is already running.')
   else
-    FormOOAIMain.AddLog('App is already running, new param: ' + ANextParam);
+  begin
+    { If unicode not supported, the log may display garbled text,
+      but in fact, the param has recved correctly, you can handle
+      it manually. }
+    FormOOAIMain.AddLog('App is already running, new param: ' + string(ANextParam));
+  end;
 end;
 
 procedure MyOnAppCheck(IsAppRunning: Boolean; var ANeedNotify: Boolean);
 begin
+  { NOTE: This proc executed in each app context. }
+
   if IsAppRunning then
   begin
+    { This executed in the next app context. }
+
     { Notify the first application or not. }
     ANeedNotify := True;
 
-    { If possible, you can do more initializations here,
-      e.g. write more information to your shared memory
-      to communication with the first application.
+    { If necessary, you can do more initializations before the
+      notification, e.g. write more information to other shared
+      memory to communication with the first application.
     }
+  end else
+  begin
+    { This executed in the first app context, so the "ANeedNotify"
+      is ignored. }
+
+    { You can do some work after you have known that there is no
+      other app is running. }
   end;
 end;
 
@@ -50,14 +68,14 @@ begin
 
   { 3. Use anonymous method. }
 //  if OnlyOneAppInst(CAppGlobalUniqueID,
-//                    procedure(ANextPID: UInt64; const ANextParam: string)
+//                    procedure(ANextPID: UInt64; const ANextParam: ATOOAIParamString)
 //                    begin
 //                      MyOnAppCall(ANextPID, ANextParam);
 //                    end).IsAppRunning then
 //    Exit;
 
-   { 4. NOTE: if use inline var in begin end scope, it should be declare a
-              global var to save the intf.
+   { 4. NOTE: Do not use inline var in begin end scope, it should be declare a
+              global var to hold the intf.
 
      begin
        if SomeCondition then

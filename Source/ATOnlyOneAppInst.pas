@@ -43,6 +43,7 @@
 
   Version 1.004 by ZY:
     (2022.01.15) * Change param string type.
+    (2022.02.02) * remove redundant debug codes.
 
 *)
 
@@ -161,7 +162,7 @@ resourcestring
   sOpenMemFileMappingFailed   = 'Open mem file mapping ''%s'' failed, error msg: %s.';
   sAccessMemDataFailed        = 'Access mem data failed, error msg: %s.';
 
-//{$DEFINE Debug_ATOnlyOneAppInst}
+{$DEFINE Debug_ATOnlyOneAppInst}
 
 procedure DebugOutput(const AMsg: string); overload;
 begin
@@ -334,11 +335,7 @@ begin
     raise Exception.CreateResFmt(@sCreateMutexError,
       [FAppGlobalUniqueID, SysErrorMessage(LErrorCode)]);
 
-  DebugOutput('Mutex %u, name ''%s'' create successful. ', [FAppMutex, FAppGlobalUniqueID]);
-
   FIsAppRunning := (LErrorCode = ERROR_ALREADY_EXISTS);
-
-  DebugOutput('App is running = %s.', [BoolToStr(FIsAppRunning, True)]);
 
   { Register a global msg id for broadcasting. }
   FAppMsgID := RegisterWindowMessage(PChar(FAppGlobalUniqueID));
@@ -347,15 +344,12 @@ begin
     raise Exception.CreateResFmt(@sRegisterWindowMessageError,
       [FAppGlobalUniqueID, SysErrorMessage(LErrorCode)]);
 
-  DebugOutput('RegisterWindowMessage ''%s'' successful.', [FAppGlobalUniqueID]);
-
   { Callback event and msg monitor only used in the first app. }
   if not FIsAppRunning then
   begin
     FAppMsgHandle := AllocateHWnd(InternalWndProc);
     if FAppMsgHandle = 0 then
       raise Exception.CreateResFmt(@sCreateHWndError, [SysErrorMessage(LErrorCode)]);
-    DebugOutput('AllocateHWnd %u successful.', [FAppMsgHandle]);
   end;
 end;
 
@@ -364,14 +358,12 @@ begin
   if FAppMsgHandle <> 0 then
   begin
     DeallocateHWnd(FAppMsgHandle);
-    DebugOutput('DeallocateHWnd %u successful.', [FAppMsgHandle]);
     FAppMsgHandle := 0;
   end;
 
   if FAppMutex <> 0 then
   begin
     CloseHandle(FAppMutex);
-    DebugOutput('Mutex %u Closed successful.', [FAppMutex]);
     FAppMutex := 0;
   end;
 
@@ -428,17 +420,20 @@ begin
 
   if ParamCount = 0 then
   begin
-    DebugOutput('No param found.');
-
     { Param is empty, post the registered msg to applications(except current app),
       the first app will has a notification. }
     LBroadcastSystemMessageResult := BroadcastSystemMessage(
       BSF_IGNORECURRENTTASK or BSF_POSTMESSAGE, @CRecipients, FAppMsgID, 0, 0);
 
-    if LBroadcastSystemMessageResult <> -1 then
-      DebugOutput('BroadcastSystemMessage successful.')
-    else
-      DebugOutput('BroadcastSystemMessage failed, error: ''%s''.', [SysErrorMessage(GetLastError)]);
+    { From docs.microsoft:
+      If the function succeeds, the return value is a positive value.
+      If the function is unable to broadcast the message, the return value is -1.
+      If the dwFlags parameter is BSF_QUERY and at least one recipient returned
+      BROADCAST_QUERY_DENY to the corresponding message, the return value is zero.
+      To get extended error information, call GetLastError. }
+    if LBroadcastSystemMessageResult = -1 then
+      DebugOutput('BroadcastSystemMessage is unable to broadcast the message, error: ''%s''.',
+        [SysErrorMessage(GetLastError)]);
   end else
   begin
     { Param exists, we use "SendMessageTimeout" instead of "BroadcastSystemMessage",
@@ -454,8 +449,6 @@ begin
     LParamBytesSize := Length(LParamBytes);
     Assert(LParamBytesSize <> 0);
 
-    DebugOutput('Param found ''%s''. ', [ParamStrToDefaultStr(LParamStr)]);
-
     { Create mem file mapping. }
     LMemFileMappingHandle := CreateFileMapping(INVALID_HANDLE_VALUE, nil,
       PAGE_READWRITE, 0, LParamBytesSize, PChar(LMemFileMappingName));
@@ -463,8 +456,6 @@ begin
     if LMemFileMappingHandle = 0 then
       raise Exception.CreateResFmt(@sCreateMemFileMappingFailed,
         [LMemFileMappingName, SysErrorMessage(LErrorCode)]);
-
-    DebugOutput('CreateFileMapping ''%s'', size %u successful. ', [LMemFileMappingName, LParamBytesSize]);
 
     try
       { Try access the mem. }
@@ -475,7 +466,6 @@ begin
       try
         { Write param to mem. }
         Move(LParamBytes[Low(LParamBytes)], LMapViewOfFile^, LParamBytesSize);
-        DebugOutput('MapViewOfFile write param successful, broadcasting message now...');
 
         { Sync broadcast message and waiting for the first app to query
           the param, we will exit normally if successed otherwise the first
@@ -494,9 +484,7 @@ begin
           {$IFDEF DXE2AndUp}nil{$ELSE}lpdwResult{$ENDIF});
 
         { If the function succeeds, the return value is nonzero. }
-        if LSendMsgResult <> 0 then
-          DebugOutput('SendMessageTimeout successful.')
-        else
+        if LSendMsgResult = 0 then
           DebugOutput('SendMessageTimeout failed, error: ''%s''.', [SysErrorMessage(GetLastError)]);
       finally
         UnmapViewOfFile(LMapViewOfFile);
@@ -533,7 +521,6 @@ begin
     if LMemFileMappingHandle = 0 then
       raise Exception.CreateResFmt(@sOpenMemFileMappingFailed,
         [LMemFileMappingName, SysErrorMessage(LErrorCode)]);
-    DebugOutput('OpenFileMapping ''%s'' successful.', [LMemFileMappingName]);
 
     try
       { Try access the mem. }
@@ -542,14 +529,12 @@ begin
       if LMapViewOfFile = nil then
         raise Exception.CreateResFmt(@sAccessMemDataFailed,
           [SysErrorMessage(LErrorCode)]);
-      DebugOutput('MapViewOfFile ''%s'' with readmode successful.', [LMemFileMappingName]);
 
       try
         { Read param from mem. }
         SetLength(LParamBytes, AParamSize);
         Move(LMapViewOfFile^, LParamBytes[Low(LParamBytes)], AParamSize);
         LParamStr := BytesToParamStr(LParamBytes);
-        DebugOutput('Read param ''%s'' successful.', [ParamStrToDefaultStr(LParamStr)]);
       finally
         UnmapViewOfFile(LMapViewOfFile);
       end;

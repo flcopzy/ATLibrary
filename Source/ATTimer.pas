@@ -35,6 +35,10 @@
     (2021.07.10) * fixed a compile error when use default
                    TTimer on other platforms.
 
+  Version 1.003 by ZY:
+    (2022.11.08) + Add an interval out of range exception.
+                 + Add compatible code for other platforms.
+    
 *)
 
 unit ATTimer;
@@ -55,19 +59,18 @@ uses
   Windows, Messages, {$IFDEF HAS_UNIT_SCOPE}Vcl.Forms{$ELSE}Forms{$ENDIF}
   , SysUtils, Classes, MMSystem
 {$ELSE}
-  FMX.Types
+  System.Classes, FMX.Types
 {$ENDIF};
 
 const
-  ATTimerVersion = '1.002';
+  ATTimerVersion = '1.003';
 
-{$IFDEF MSWINDOWS}  
   ATTIMER_DEFAULT_INTERVAL = 1000 {ms};
-{$ENDIF}
 
 type
 
 {$IFDEF MSWINDOWS}
+  /// <summary> A high-precision timer. </summary>
   TATTimer = class(TComponent)
   private
     FMsgHandle: HWND;
@@ -85,6 +88,8 @@ type
     procedure SetOnTimer(const AValue: TNotifyEvent);
     procedure CheckIfRaiseMMResult(const ARoutine: string; AMMResult: MMRESULT);
     procedure TimerWndProc(var AMsg: TMessage);
+    function GetDebugName: string;
+    property DebugName: string read GetDebugName;
   protected
     procedure Timer; dynamic;
     procedure KillTimer; virtual;
@@ -113,7 +118,20 @@ type
     property OnTimer: TNotifyEvent read FOnTimer write SetOnTimer;
   end;
 {$ELSE}
-  TATTimer = TTimer;
+  /// <summary> A wrapper of TTimer, high-precision not supported, only for compatible. </summary>
+  TATTimer = class(TTimer)
+  private
+    function GetSysPeriodMin: Cardinal;
+    function GetSysPeriodMax: Cardinal;
+    function GetResolution: Cardinal;
+    procedure SetResolution(AValue: Cardinal);
+  public
+    constructor CreateNew(AOnTimer: TNotifyEvent; AInterval: Cardinal = ATTIMER_DEFAULT_INTERVAL;
+      AEnabled: Boolean = True; AResolution: Cardinal = 0);
+    property SysPeriodMin: Cardinal read GetSysPeriodMin;
+    property SysPeriodMax: Cardinal read GetSysPeriodMax;
+    property Resolution: Cardinal read GetResolution write SetResolution;
+  end;
 {$ENDIF}
 
 implementation
@@ -121,9 +139,9 @@ implementation
 {$IFDEF MSWINDOWS}
 
 resourcestring
-
-  sNoMultimediaTimers = 'Not enough multimedia timers available.';
-  sCallProcFailed     = '%s call ''%s'' failed, error code: %u.';
+  sCreateMMTimerFailed = 'ATTimer ''%s'' create failed.';
+  sIntervalOutOfRange  = 'ATTimer ''%s'' interval %u out of range [%u, %u].';
+  sCallProcFailed      = 'ATTimer ''%s'' call ''%s'' failed, error mmresult code: %u.';
 
 const
 
@@ -193,6 +211,18 @@ begin
   inherited;
 end;
 
+function TATTimer.GetDebugName: string;
+begin
+  Result := Name;
+  if Result = '' then
+    Result := 'Obj' +
+{$IFDEF CPUX64}
+    IntToStr(NativeUInt(Self))
+{$ELSE}
+    IntToStr(Integer(Self))
+{$ENDIF}
+end;
+
 type
 
 {$IFDEF D2010AndUp}
@@ -217,7 +247,14 @@ begin
              just pass the msg handle and call PostMessage
              directly. }
 
-  PostMessage(HWND(dwUser), WM_ATTIMER_MSGID, 0, 0);
+  { From Microsoft:
+      If create timer failed, the timer identifier will be null,
+      and this identifier is also passed to the callback function.
+
+      So, if uTimerID = 0, we do nothing.
+  }
+  if uTimerID <> 0 then
+    PostMessage(HWND(dwUser), WM_ATTIMER_MSGID, 0, 0);
 end;
 
 procedure TATTimer.SetEnabled(const AValue: Boolean);
@@ -281,7 +318,7 @@ procedure TATTimer.CheckIfRaiseMMResult(const ARoutine: string;
   AMMResult: MMRESULT);
 begin
   if AMMResult <> TIMERR_NOERROR then
-    raise Exception.CreateResFmt(@sCallProcFailed, [Name, ARoutine, AMMResult]);
+    raise Exception.CreateResFmt(@sCallProcFailed, [DebugName, ARoutine, AMMResult]);
 end;
 
 procedure TATTimer.KillTimer;
@@ -302,8 +339,52 @@ begin
     FTimerID := timeSetEvent(FInterval, FResolution, @InternalTimerCallback,
       FMsgHandle, TIME_PERIODIC or TIME_KILL_SYNCHRONOUS);
     if FTimerID = 0 then
-      raise EOutOfResources.CreateRes(@sNoMultimediaTimers);
+    begin
+      if (FInterval < FSysPeriodMin) or (FInterval > FSysPeriodMax) then
+        raise Exception.CreateResFmt(@sIntervalOutOfRange,
+          [DebugName, FInterval, FSysPeriodMin, FSysPeriodMax])
+      else
+      begin
+        { From Microsoft:
+          Returns an identifier for the timer event if successful or an error otherwise.
+          This function returns NULL if it fails and the timer event was not created.
+
+          So, we have no way to get any other detail error. }
+        raise Exception.CreateResFmt(@sCreateMMTimerFailed, [DebugName]);
+      end;
+    end;
   end;
+end;
+
+{$ELSE}
+
+constructor TATTimer.CreateNew(AOnTimer: TNotifyEvent; AInterval: Cardinal;
+  AEnabled: Boolean; AResolution: Cardinal);
+begin
+  inherited Create(nil);
+  Interval   := AInterval;
+  Resolution := AResolution;
+  Enabled    := AEnabled;
+  OnTimer    := AOnTimer;
+end;
+
+function TATTimer.GetResolution: Cardinal;
+begin
+  Result := 0;
+end;
+
+function TATTimer.GetSysPeriodMax: Cardinal;
+begin
+  Result := 0;
+end;
+
+function TATTimer.GetSysPeriodMin: Cardinal;
+begin
+  Result := 0;
+end;
+
+procedure TATTimer.SetResolution(AValue: Cardinal);
+begin
 end;
 {$ENDIF MSWINDOWS TATTimer}
 

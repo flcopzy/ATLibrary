@@ -1,5 +1,5 @@
 ## Delphi Auxiliary Toolkit
- A set of units for delphi, the purposes is to simplify development, it should supports delphi7 and above(tested in D7, TD, XE2, XE5, XE7, D10, D10.1, D10.2, D10.3, D10.4) and the platforms Windows(XP or later) and Android(MacOS and iOS not tested).
+ A set of units for delphi, the purposes is to simplify development, it should supports delphi7 and above(tested in D7, TD, XE2, XE5, XE7, D10, D10.1, D10.2, D10.3, D10.4, D11) and the platforms Windows(XP or later) and Android(MacOS and iOS not tested).
 ## Install
  Clone the repository, and add units to your project. 
 ## Features  

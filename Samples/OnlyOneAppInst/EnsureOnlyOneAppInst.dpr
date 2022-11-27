@@ -21,9 +21,9 @@ begin
     FormOOAIMain.AddLog('App is already running.')
   else
   begin
-    { If unicode not supported, the log may display garbled text,
-      but in fact, the param has recved correctly, you can handle
-      it manually. }
+    { If unicode not supported(before Delphi2009), the log may display
+      garbled text, but in fact, the param has recved correctly, you can
+      handle it manually. }
     FormOOAIMain.AddLog('App is already running, new param: ' + string(ANextParam));
   end;
 end;
@@ -74,8 +74,10 @@ begin
 //                    end).IsAppRunning then
 //    Exit;
 
-   { 4. NOTE: Do not use inline var in begin end scope, it should be declare a
-              global var to hold the intf.
+   { 4. NOTE: Do not use inline var in sub begin-end scope, you need declare a
+              global var to hold the intf, as the intf will auto freed when out
+              ot the scope.
+
 
      begin
        if SomeCondition then
@@ -94,6 +96,19 @@ begin
        LInst: IATOnlyOneAppInst;
      begin
        LInst := OnlyOneAppInst(CAppGlobalUniqueID, MyOnAppCall);
+       if SomeCondition then
+       begin
+         if LInst.IsAppRunning then
+           Exit;
+       end;
+
+       ...
+     end.
+
+     or
+
+     begin
+       var LInst := OnlyOneAppInst(CAppGlobalUniqueID, MyOnAppCall);
        if SomeCondition then
        begin
          if LInst.IsAppRunning then

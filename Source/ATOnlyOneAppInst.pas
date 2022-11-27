@@ -105,7 +105,7 @@ type
 ///
 /// <remarks> NOTE 1. AppGlobalUniqueID is a global unique id, it is best to use
 ///                   a guid combination string and should not already used by
-///                   other objects, like Event, Mutex etc.
+///                   other kernel objects, like Event, Mutex etc.
 ///
 ///                2. Usually it only needs to be used once in dpr file, and do
 ///                   not used in thread, it is pointless.
@@ -114,8 +114,12 @@ type
 ///                   not a GUI application(required message loop), in other words,
 ///                   you can only check if application is running or not.
 ///
-///                4. On MSWindows, it only affects the same session, in other words,
-///                   both userA and userB can run the same appcalition on their own session.
+///                4. On MSWindows, it only affects the same session by default,
+///                   in other words, both userA and userB can run the same appcalition
+///                   on their own session, but in fact, you can add a "Global\" prefix to
+///                   unique ID to check application is running or not on different sessions,
+///                   for example:
+///                   "Global\YourGlobalUniqueID" (without double quotes)
 ///
 ///                5. When cmd param is not empty, the app callback event should not
 ///                   do heavy work, because the next application will wait for a while

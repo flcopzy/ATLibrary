@@ -10,7 +10,7 @@ uses
 const
   CAppGlobalUniqueID = '{F1FB2123-DD15-44DF-B03B-9D724467AA34}_OnlyOneAppInst_Demo';
 
-procedure MyOnAppCall(ANextPID: UInt64; const ANextParam: ATOOAIParamString);
+procedure MyOnAppCall(ANextPID: Int64; const ANextParam: ATOOAIParamString);
 begin
   { NOTE: This proc executed only in the first app context. }
 
@@ -54,7 +54,10 @@ begin
 end;
 
 begin
+
+{$IF Declared(ReportMemoryLeaksOnShutdown)}
   ReportMemoryLeaksOnShutdown := True;
+{$IFEND}
 
   Application.Initialize;
 
@@ -68,7 +71,7 @@ begin
 
   { 3. Use anonymous method. }
 //  if OnlyOneAppInst(CAppGlobalUniqueID,
-//                    procedure(ANextPID: UInt64; const ANextParam: ATOOAIParamString)
+//                    procedure(ANextPID: Int64; const ANextParam: ATOOAIParamString)
 //                    begin
 //                      MyOnAppCall(ANextPID, ANextParam);
 //                    end).IsAppRunning then

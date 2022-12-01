@@ -76,7 +76,7 @@ type
   /// <param name="ANextParam"> The param of the next app, empty if no param passed. </param>
   /// <remarks> This callback executed on the first application context. </remarks>
   TATAppCallback = {$IFDEF HAS_ANONYMOUSMETHOD}reference to{$ENDIF}
-                   procedure(ANextPID: UInt64; const ANextParam: ATOOAIParamString);
+                   procedure(ANextPID: Int64; const ANextParam: ATOOAIParamString);
 
   /// <summary> Application check procedure. </summary>
   /// <param name="IsAppRunning"> Indicates whether application is already running. </param>
@@ -138,7 +138,7 @@ function OnlyOneAppInst(const AAppGlobalUniqueID: string = '';
 
 in dpr:
 
-procedure MyOnAppCall(ANextPID: UInt64; const ANextParam: ATOOAIParamString);
+procedure MyOnAppCall(ANextPID: Int64; const ANextParam: ATOOAIParamString);
 begin
   { App is already running, you can use the param if exists. }
 end;
@@ -417,7 +417,7 @@ begin
     Exit
   else
   begin
-    { Appcalition is running. }
+    { Appcalition is running, check if should do a notify. }
     if not LNeedNotify then
       Exit;
   end;
@@ -517,7 +517,7 @@ begin
     DoAppCallback(APID, '')
   else
   begin
-    { Try open the mem that created by the new app. }
+    { Param found, try open the mem that created by the new app. }
     LMemFileMappingName := GetGlobalMemFileMappingName(APID);
     LMemFileMappingHandle := OpenFileMapping(FILE_MAP_READ, False,
       PChar(LMemFileMappingName));

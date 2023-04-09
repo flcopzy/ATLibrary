@@ -4,7 +4,7 @@
 {   ModuleName  :   ATTimeWatcher                                             }
 {   Author      :   ZY                                                        }
 {   EMail       :   zylove619@hotmail.com                                     }
-{   Description :   A very lightweight stopwatch.                             }
+{   Description :   A very lightweight stopwatch for Delphi/FPC.              }
 {                                                                             }
 { *************************************************************************** }
 
@@ -35,6 +35,9 @@
   Version 1.002 by ZY:
     (2016.11.29) + Add GetTickCount64 if Windows Vista or later.
                  + Add ElapsedMsFrom and ElapsedUsFrom.
+
+  Version 1.003 by ZY:
+    (2023.04.03) + FPC supported.
 *)
 
 (* Useage:
@@ -71,10 +74,11 @@ interface
 
 const
 
-  ATTimeWatcherVersion = '1.002';
+  ATTimeWatcherVersion = '1.003';
 
 type
-  TATTimeWatcher = {$IFDEF D2006AndUp}record{$ELSE}object{$ENDIF}
+  /// <summary> A very lightweight stopwatch. </summary>
+  TATTimeWatcher = {$IFDEF FPC}record{$else}{$IFDEF D2006AndUp}record{$ELSE}object{$ENDIF}{$ENDIF}
   private
     FStartTimeStamp: Int64;
     function GetElapsedTicks: Int64;
@@ -82,15 +86,21 @@ type
     function GetElapsedMilliseconds: Int64;
     function GetElapsed: string;
   public
+    /// <summary> Start new or restart a watcher. </summary>
     procedure Start;
+    /// <summary> Elapsed milliseconds from a timeatamp. </summary>
     function ElapsedMsFrom(ATimeStamp: Int64): Int64;
+    /// <summary> Elapsed microseconds from a timeatamp. </summary>
     function ElapsedUsFrom(ATimeStamp: Int64): Extended;
+    /// <summary> Get system time stamp. </summary>
     function GetTimeStamp: Int64;
-
+    /// <summary> Elapsed ticks. </summary>
     property ElapsedTicks: Int64 read GetElapsedTicks;
+    /// <summary> Elapsed microseconds. </summary>
     property ElapsedMicroseconds: Extended read GetElapsedMicroseconds;
+    /// <summary> Elapsed milliseconds. </summary>
     property ElapsedMilliseconds: Int64 read GetElapsedMilliseconds;
-    { Elapsed milliseconds, retain 3 decimals e.g. 1.234 }
+    /// <summary> Elapsed milliseconds string, retain 3 decimals e.g. '1.234'. </summary>
     property Elapsed: string read GetElapsed;
   end;
 
@@ -102,7 +112,8 @@ uses
   , Windows
 {$ELSE}
   , Classes
-{$ENDIF};
+{$ENDIF}
+  , ATUtils;
 
 { Internal global vars, initialized only once. }
 var
@@ -142,11 +153,7 @@ var
 begin
   LFrequency := 1;
   
-{$IFDEF DXEAndUp}
-  TWFormatSettings := TFormatSettings.Create;
-{$ELSE}
-  GetLocaleFormatSettings(SysLocale.DefaultLCID, TWFormatSettings);
-{$ENDIF}
+  TWFormatSettings := ATGetFormatSettings;
 
 {$IFDEF MSWINDOWS}
   GetProcGetTickCount64;
@@ -214,7 +221,7 @@ begin
   else
     Result := WinGetTickCount;
 {$ELSE}
-  Result := TThread.GetTickCount;
+  Result := {$IFDEF USE_DELPHI}TThread.GetTickCount{$ELSE}TThread.GetTickCount64{$ENDIF};
 {$ENDIF}
 end;
 

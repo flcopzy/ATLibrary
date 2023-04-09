@@ -38,15 +38,20 @@
   Version 1.003 by ZY:
     (2022.11.08) + Add an interval out of range exception.
                  + Add compatible code for other platforms.
+
+  Version 1.004 by ZY:
+    (2023.04.03) + FPC Supported.
     
 *)
 
 unit ATTimer;
 
-{$IFDEF CONDITIONALEXPRESSIONS}
-  {$IF CompilerVersion >= 25.0}
-    {$LEGACYIFEND ON}
-  {$IFEND}
+{$IFDEF USE_DELPHI}
+  {$IFDEF CONDITIONALEXPRESSIONS}
+    {$IF CompilerVersion >= 25.0}
+      {$LEGACYIFEND ON}
+    {$IFEND}
+  {$ENDIF}
 {$ENDIF}
 
 {$I AT.inc}
@@ -55,15 +60,25 @@ interface
 
 uses
 
+ SysUtils, Classes
 {$IFDEF MSWINDOWS}
-  Windows, Messages, {$IFDEF HAS_UNIT_SCOPE}Vcl.Forms{$ELSE}Forms{$ENDIF}
-  , SysUtils, Classes, MMSystem
+  , Windows, Messages, MMSystem
+  { ATLib }
+  , ATCommon, ATUtils
+{$ENDIF}
+
+{$IFDEF USE_DELPHI}
+  {$IFDEF USE_FMX}
+    , {$IFNDEF MSWINDOWS}FMX.Types{$ENDIF}
+  {$ENDIF}
 {$ELSE}
-  System.Classes, FMX.Types
-{$ENDIF};
+   , ExtCtrls
+{$ENDIF}
+;
 
 const
-  ATTimerVersion = '1.003';
+
+  ATTimerVersion = '1.004';
 
   ATTIMER_DEFAULT_INTERVAL = 1000 {ms};
 
@@ -137,11 +152,8 @@ type
 implementation
 
 {$IFDEF MSWINDOWS}
-
-resourcestring
-  sCreateMMTimerFailed = 'ATTimer ''%s'' create failed.';
-  sIntervalOutOfRange  = 'ATTimer ''%s'' interval %u out of range [%u, %u].';
-  sCallProcFailed      = 'ATTimer ''%s'' call ''%s'' failed, error mmresult code: %u.';
+uses
+  ATConsts;
 
 const
 
@@ -181,7 +193,7 @@ begin
   FInterval  := ATTIMER_DEFAULT_INTERVAL;
   
   { Create the timer msg listener. }
-  FMsgHandle := AllocateHWnd(TimerWndProc);
+  FMsgHandle := ATAllocateHWnd(TimerWndProc);
 end;
 
 constructor TATTimer.CreateNew(AOnTimer: TNotifyEvent; AInterval: UINT;
@@ -201,7 +213,7 @@ begin
 
   if FMsgHandle <> 0 then
   begin
-    DeallocateHWnd(FMsgHandle);
+    ATDeallocateHWnd(FMsgHandle);
     FMsgHandle := 0;
   end;
 
@@ -215,21 +227,8 @@ function TATTimer.GetDebugName: string;
 begin
   Result := Name;
   if Result = '' then
-    Result := 'Obj' +
-{$IFDEF CPUX64}
-    IntToStr(NativeUInt(Self))
-{$ELSE}
-    IntToStr(Integer(Self))
-{$ENDIF}
+    Result := ClassName + IntToStr(ATUIntPtr(Self));
 end;
-
-type
-
-{$IFDEF D2010AndUp}
-  ATUIntPtr = DWORD_PTR;
-{$ELSE}
-  ATUIntPtr = DWORD;
-{$ENDIF}  
 
 procedure InternalTimerCallback(uTimerID, uMessage: UINT;
   dwUser, dw1, dw2: ATUIntPtr) stdcall;
@@ -273,12 +272,19 @@ begin
 end;
 
 procedure TATTimer.TimerWndProc(var AMsg: TMessage);
+
+  procedure ATHandleException(AException: Exception);
+  begin
+    ATOutputLibsError(DebugName, AException.Message);
+  end;
+
 begin
   if AMsg.Msg = WM_ATTIMER_MSGID then
     try
       Timer;
     except
-      Application.HandleException(Self);
+      on E: Exception do
+        ATHandleException(E);
     end
   else
     AMsg.Result := DefWindowProc(FMsgHandle, AMsg.Msg, AMsg.WParam, AMsg.LParam);
@@ -318,7 +324,7 @@ procedure TATTimer.CheckIfRaiseMMResult(const ARoutine: string;
   AMMResult: MMRESULT);
 begin
   if AMMResult <> TIMERR_NOERROR then
-    raise Exception.CreateResFmt(@sCallProcFailed, [DebugName, ARoutine, AMMResult]);
+    raise EATException.CreateResFmt(@atsCallProcFailed, [DebugName, ARoutine, AMMResult]);
 end;
 
 procedure TATTimer.KillTimer;
@@ -341,7 +347,7 @@ begin
     if FTimerID = 0 then
     begin
       if (FInterval < FSysPeriodMin) or (FInterval > FSysPeriodMax) then
-        raise Exception.CreateResFmt(@sIntervalOutOfRange,
+        raise EATException.CreateResFmt(@atsIntervalOutOfRange,
           [DebugName, FInterval, FSysPeriodMin, FSysPeriodMax])
       else
       begin
@@ -349,8 +355,8 @@ begin
           Returns an identifier for the timer event if successful or an error otherwise.
           This function returns NULL if it fails and the timer event was not created.
 
-          So, we have no way to get any other detail error. }
-        raise Exception.CreateResFmt(@sCreateMMTimerFailed, [DebugName]);
+          So, we have no way to get any other detail error msg. }
+        raise EATException.CreateResFmt(@atsCreateMMTimerFailed, [DebugName]);
       end;
     end;
   end;

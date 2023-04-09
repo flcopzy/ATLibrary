@@ -5,7 +5,7 @@
 {   Author      :   ZY                                                        }
 {   EMail       :   zylove619@hotmail.com                                     }
 {   Description :   ATLogger provides a very lightweight logging for          }
-{                   delphi based applications, it is simple, efficient        }
+{                   Delphi/FPC based applications, it is simple, efficient    }
 {                   and flexible.                                             }
 {                                                                             }
 { *************************************************************************** }
@@ -62,51 +62,60 @@
     (2021.06.16) - Remove "WAIT_FOR_FINISHED_WHEN_TERMINATED" switch, now
                    use Logger.WaitforFinishedWhenTerminated.
                  + Add more overload function to IATLogger.
+
+  Version 1.007 by ZY:
+    (2023.04.03) + FPC supported.
+    
 *)
 
 unit ATLogger;
 
 {$I AT.inc}
-{$WARN SYMBOL_PLATFORM OFF}
+
+{$IFDEF USE_DELPHI}
+  {$WARN SYMBOL_PLATFORM OFF}
+{$ENDIF}
 
 interface
 
 uses
 
-  Classes, SyncObjs, StrUtils
-{$IFDEF DXEAndUp}
-  , DateUtils
-{$ENDIF}
-{$IFDEF MSWINDOWS}
-  {$IFDEF HAS_UNIT_SCOPE}
-  , Winapi.Windows, System.Win.Registry, Vcl.Forms
+  SysUtils, Classes, SyncObjs, StrUtils
+
+{$IFDEF USE_DELPHI}
+  {$IFDEF DXEAndUp}
+    , DateUtils
+  {$ENDIF}
+  {$IFDEF MSWINDOWS}
+    {$IFDEF HAS_UNIT_SCOPE}
+    , Winapi.Windows, Vcl.Forms
+    {$ELSE}
+    , Windows, Forms
+    {$ENDIF}
   {$ELSE}
-  , Windows, Registry, Forms
+    , FMX.Forms, FMX.Types
+  {$ENDIF}
+
+  {$IFDEF TLIST_DEPRECATED}
+    , System.Generics.Collections
+  {$ENDIF}
+  {$IFDEF HAS_IOUTILS}
+    , {$IFDEF HAS_UNIT_SCOPE}System.IOUtils{$ELSE}IOUtils{$ENDIF}
   {$ENDIF}
 {$ELSE}
-  , FMX.Forms, FMX.Types
-{$ENDIF}
-  , SysUtils
-{$IFDEF TLIST_DEPRECATED}
-  , System.Generics.Collections
-{$ENDIF}
-{$IFDEF HAS_IOUTILS}
-  , {$IFDEF HAS_UNIT_SCOPE}System.IOUtils{$ELSE}IOUtils{$ENDIF}
-{$ENDIF}
-{$IFDEF ANDROID}
-  , Androidapi.Log
-{$ENDIF}
-{$IFDEF IOS}
-  , iOSApi.Foundation
-{$ENDIF}
-{$IFDEF MACOS}
-  , Macapi.ObjectiveC
-{$ENDIF}
+  { FPC }
+  {$IFDEF MSWINDOWS}
+    , Windows
+  {$ENDIF}
+
+{$ENDIF USE_DELPHI}
+
+  , ATCommon, ATUtils, ATConsts
 ;
 
 const
 
-  ATLoggerVersion = '1.006';
+  ATLoggerVersion = '1.007';
 
 type
 
@@ -125,7 +134,7 @@ const
 type
 
   /// <summary> Base log exception. </summary>
-  EATLogException = class(Exception);
+  EATLogException = class(EATException);
 
   /// <summary> Log file name callback function, used by "NewFileLogger". </summary>
   TATLogFileNameFunc  = {$IFDEF HAS_ANONYMOUSMETHOD}reference to {$ENDIF}function: string;
@@ -223,7 +232,7 @@ type
 { LogElementList }
 
   /// <summary> Log element list. </summary>
-  TATLogElementList = class({$IFDEF TLIST_DEPRECATED}TList<PATLogElement>{$ELSE}TList{$ENDIF})
+  TATLogElementList = class({$IFDEF USE_DELPHI}{$IFDEF TLIST_DEPRECATED}TList<PATLogElement>{$ELSE}TList{$ENDIF}{$ELSE}TList{$ENDIF})
   private
     function GetElement(AIndex: Integer): PATLogElement;
   public
@@ -451,11 +460,6 @@ implementation
   {.$DEFINE DEBUG_LOG}
 {$ENDIF !RELEASE}
 
-resourcestring
-
-  sLogTooManyInstances = 'Too many log instances created, the max count current supported is %d.';
-  sLogInvalidLogLevel  = 'Invalid log level %d';
-
 const
 
   LOG_DEFAULT_DATETIMEFORMAT = 'yyyy-mm-dd hh:nn:ss.zzz';
@@ -503,193 +507,19 @@ var
   { Default format settings for internal use. }
   InternalDefaultFormatSettings: TFormatSettings;
 
-function Atomic_Inc(var ATarget: Integer): Integer;
-begin
-{$IFDEF DXEAndUp}
-  Result := TInterlocked.Increment(ATarget);
-{$ELSE}
-  Result := InterlockedIncrement(ATarget);
-{$ENDIF}
-end;
-
-function Atomic_Dec(var ATarget: Integer): Integer;
-begin
-{$IFDEF DXEAndUp}
-  Result := TInterlocked.Decrement(ATarget);
-{$ELSE}
-  Result := InterlockedDecrement(ATarget);
-{$ENDIF}
-end;
-
-function Atomic_Read(var ATarget: Integer): Integer;
-begin
-{$IFDEF DXEAndUp}
-  Result := TInterlocked.CompareExchange(ATarget, 0, 0);
-{$ELSE}
-  Result := InterlockedExchangeAdd(@ATarget, 0);
-{$ENDIF}
-end;
-
-function GetFormatSettings: TFormatSettings;
-begin
-{$IFDEF DXEAndUp}
-  Result := TFormatSettings.Create;
-{$ELSE}
-  GetLocaleFormatSettings(SysLocale.DefaultLCID, Result);
-{$ENDIF}
-end;
-
 function GetTimeZone: string;
-{$IFNDEF DXEAndUp}
-const
-  CGMT   = 'GMT';  { Do not localize }
-{$IFDEF MSWINDOWS}
-  CPlus  = '+';    { Do not localize }
-  CMinus = '-';    { Do not localize }
-var
-  LTimeZone: TTimeZoneInformation;
-  LOffset  : Integer;
-  LSignChar: Char;
-{$ENDIF MSWINDOWS}
-{$ENDIF !DXEAndUp}
 begin
-{$IFDEF DXEAndUp}
-  Result := TTimeZone.Local.Abbreviation;
-{$ELSE}
-  {$IFDEF MSWINDOWS}
-  GetTimeZoneInformation(LTimeZone);
-
-  LOffset := LTimeZone.Bias div -60;
-  if LOffset > 0 then
-    LSignChar := CPlus
-  else
-    LSignChar := CMinus;
-
-  Result := Format('%s%s%.2d', [CGMT, LSignChar, Abs(LOffset)],
-                                InternalDefaultFormatSettings);
-  {$ELSE}
-  Result := CGMT;
-  {$ENDIF}
-{$ENDIF}
-end;
-
-function GetOSName: string;
-const
-  CUnknownOsName = 'Unknown OS';
-
-{$IFDEF MSWINDOWS}
-  function GetWinOSArchitecture: string;
-  const
-    CProcessorArchitectureAMD64 = 9;
-    CArchitecture32     = '32-bit';
-    CArchitecture64     = '64-bit';
-    CArchitectureUnknow = 'Unknow-bit';
-  var
-    LSystemInfo: TSystemInfo;
-    LGetNativeSystemInfo: procedure(var lpSystemInformation: TSystemInfo); stdcall;
-  begin
-    LGetNativeSystemInfo := GetProcAddress(GetModuleHandle(Kernel32), 'GetNativeSystemInfo');
-    if Assigned(LGetNativeSystemInfo) then
-    begin
-      ZeroMemory(@LSystemInfo, SizeOf(LSystemInfo));
-      LGetNativeSystemInfo(LSystemInfo);
-      if (LSystemInfo.wProcessorArchitecture = CProcessorArchitectureAMD64) then
-        Result := CArchitecture64
-      else
-        Result := CArchitecture32;
-    end else
-      Result := CArchitectureUnknow;
-  end;
-
-  function GetWinOSVersion: string;
-  var
-    LRegistry: TRegistry;
-    LProductName,
-    LVersion,
-    LCSDVersion: string;
-  begin
-    LRegistry := TRegistry.Create(KEY_READ);
-    try
-      LRegistry.RootKey := HKEY_LOCAL_MACHINE;
-      if LRegistry.OpenKey('SOFTWARE\Microsoft\Windows NT\CurrentVersion', False) then
-        try
-          LProductName := LRegistry.ReadString('ProductName');
-
-          if LRegistry.ValueExists('CurrentMajorVersionNumber') then
-            LVersion := Format('%d.%d.%s', [LRegistry.ReadInteger('CurrentMajorVersionNumber'),
-                                            LRegistry.ReadInteger('CurrentMinorVersionNumber'),
-                                            LRegistry.ReadString ('CurrentBuildNumber')],
-                                            InternalDefaultFormatSettings)
-          else
-            LVersion := Format('%s.%s', [LRegistry.ReadString('CurrentVersion'),
-                                         LRegistry.ReadString('CurrentBuildNumber')],
-                                         InternalDefaultFormatSettings);
-
-          if LRegistry.ValueExists('CSDVersion') then
-          begin
-            LCSDVersion := LRegistry.ReadString('CSDVersion');
-            if LCSDVersion <> '' then
-              LCSDVersion := ' ' + LCSDVersion + ' ';
-          end;
-          
-          Result := Format('%s%s(Version %s, %s)', [LProductName, LCSDVersion,
-                                                    LVersion, GetWinOSArchitecture],
-                                                    InternalDefaultFormatSettings);
-        except
-          Result := CUnknownOsName;
-        end
-      else
-        Result := CUnknownOsName;
-    finally
-      LRegistry.Free;
-    end;
-  end;
-{$ENDIF MSWINDOWS}
-
-begin
-{$IFDEF MSWINDOWS}
-  Result := GetWinOSVersion;
-{$ELSE}
-  {$IFDEF HAS_TOSVERSION}
-  Result := TOSVersion.ToString;
-  {$ELSE}
-  Result := CUnknownOsName;
-  {$ENDIF}
-{$ENDIF}
-end;
-
-function GetFileSize(const AFileName: string): Int64;
-var
-  LSR: TSearchRec;
-begin
-  if FindFirst(AFileName, faAnyFile, LSR) = 0 then
-  begin
- {$IFDEF D2006AndUp}
-    Result := LSR.Size;
- {$ELSE}
-    Result := (Int64(LSR.FindData.nFileSizeHigh) shl 32) + LSR.FindData.nFileSizeLow;
- {$ENDIF}
-    FindClose(LSR);
-  end else
-    Result := -1;
+  Result := 'GMT' + ATGetLocalTimeZoneBiasStr;
 end;
 
 procedure DelDirectory(const ADir: string);
 begin
-{$IFDEF HAS_IOUTILS}
-  TDirectory.Delete(ADir);
-{$ELSE}
-  RemoveDir(ADir);
-{$ENDIF}
+  SysUtils.RemoveDir(ADir);
 end;
 
 procedure DelFile(const AFileName: string);
 begin
-{$IFDEF HAS_IOUTILS}
-  TFile.Delete(AFileName);
-{$ELSE}
-  DeleteFile(AFileName);
-{$ENDIF}
+  SysUtils.DeleteFile(AFileName);
 end;
 
 function GetDefaultLogPath: string;
@@ -697,7 +527,11 @@ begin
 {$IFDEF MSWINDOWS}
   Result := ExtractFilePath(ParamStr(0));
 {$ELSE}
+  {$IFDEF USE_DELPHI}
   Result := TPath.GetPublicPath;
+  {$ELSE}
+  Result := ExtractFilePath(ParamStr(0));
+  {$ENDIF}
 {$ENDIF}
   Result := IncludeTrailingPathDelimiter(Result) + 'Logs' + PathDelim;
 end;
@@ -844,7 +678,7 @@ constructor TATLoggerContext.Create(const AOutputter: IATLogOutputter; const ALe
 begin
   inherited Create;
 
-  Atomic_Inc(InternalLogInstanceCount);
+  TATAtomic.Inc(InternalLogInstanceCount);
 
   SetLogLevel(ALevel);
   FEnabled := True;
@@ -874,7 +708,7 @@ begin
   { Stop outputting. }
   SetEnabled(False);
 
-  Atomic_Dec(InternalLogInstanceCount);
+  TATAtomic.Dec(InternalLogInstanceCount);
 
   FLogOutputter := nil;
 
@@ -997,7 +831,7 @@ end;
 procedure TATLoggerContext.SetLogLevel(const AValue: TATLogLevel);
 begin
   if (AValue < Low(TATLogLevel)) or (AValue > High(TATLogLevel)) then
-    raise EATLogException.CreateResFmt(@sLogInvalidLogLevel, [Ord(AValue)]);
+    raise EATLogException.CreateResFmt(@atsLogInvalidLogLevel, [Ord(AValue)]);
 
   FLogLevel := AValue;
 end;
@@ -1067,8 +901,8 @@ function NewLogger(const AOutputter: IATLogOutputter; const ALevel: TATLogLevel)
 var
   LLoggerContext: TATLoggerContext;
 begin
-  if Atomic_Read(InternalLogInstanceCount) = LOG_MAX_INSTANCECOUNT then
-    raise EATLogException.CreateResFmt(@sLogTooManyInstances, [LOG_MAX_INSTANCECOUNT]);
+  if TATAtomic.Read(InternalLogInstanceCount) = LOG_MAX_INSTANCECOUNT then
+    raise EATLogException.CreateResFmt(@atsLogTooManyInstances, [LOG_MAX_INSTANCECOUNT]);
 
   LLoggerContext := TATLoggerContext.Create(AOutputter, ALevel);
   LLoggerContext.GetOutputter.FLoggerContextObject := LLoggerContext;
@@ -1205,7 +1039,7 @@ end;
 constructor TATCustomLogFormater.Create;
 begin
   inherited;
-  FFormatSettings := GetFormatSettings;
+  FFormatSettings := ATGetFormatSettings;
   FDelimiter      := ' ';
   FDateTimeFormat := LOG_DEFAULT_DATETIMEFORMAT;
   FTimeZone       := GetTimeZone;
@@ -1425,12 +1259,7 @@ begin
 
   FConsumerSibling := False;
 
-  FLogOutputWorker := TAsyncLogThread.Create(Self, DoAsycLog, True);
-{$IFDEF D2010AndUp}
-  FLogOutputWorker.Start;
-{$ELSE}
-  FLogOutputWorker.Resume;
-{$ENDIF}
+  FLogOutputWorker := TAsyncLogThread.Create(Self, DoAsycLog, False);
 end;
 
 function TATAsyncLogOutputter.CreateSynchroObject: TSynchroObject;
@@ -1484,14 +1313,6 @@ begin
 
     { If we get here, the producer is too fast and need to
       reduce productivity. }
-
-    if {$IFDEF MSWINDOWS}GetCurrentThreadId
-       {$ELSE}TThread.CurrentThread.ThreadID
-       {$ENDIF} = MainThreadID then
-      { Use ProcessMessages may has side effects, but we
-        don't want to block ui. }
-      Application.ProcessMessages;
-
     Sleep(50);
 
   goto WaitFor;
@@ -1539,51 +1360,8 @@ begin
 end;
 
 class procedure TATDefaultLogOutputter.NativeOutput(const ALog: string; ALogLevel: TATLogLevel);
-
-{$IFDEF IOS}
-  function PNSStr(const AStr: string): PNSString;
-  begin
-    Result := (NSStr(AStr) as ILocalObject).GetObjectID;
-  end;
-{$ENDIF}
-
-{$IFDEF ANDROID}
-var
-  LMarshaller: TMarshaller;
-  LText: MarshaledAString;
-{$ENDIF}
 begin
-{$IFDEF MSWINDOWS}
- { You can see the results in Delphi (View - Debug Windows - Event Log)
-   in debug mode, or use the tool: dbgview.exe from "http://www.sysinternals.com" . }
-  OutputDebugString(PChar(ALog));
-{$ENDIF}
-
-{$IFDEF IOS}
-  NSLog(PNSStr(ALog));
-{$ENDIF}
-
-{$IFDEF MACOS}
-  {$IFDEF DXE3AndUp}
-  Log.d(ALog);
-  {$ENDIF}
-{$ENDIF}
-
-{$IFDEF ANDROID}
-  LText := LMarshaller.AsAnsi(ALog).ToPointer;
-  case ALogLevel of
-    llDebug:  Androidapi.Log.__android_log_write(android_LogPriority.ANDROID_LOG_DEBUG, 'debug', LText);
-    llInfo:   LOGI(LText);
-    llWarn:   LOGW(LText);
-    llError:  LOGE(LText);
-    llFatal:  LOGF(LText);
-    else      Androidapi.Log.__android_log_write(android_LogPriority.ANDROID_LOG_VERBOSE, 'verbose', LText);
-  end;
-{$ENDIF}
-
-{$IFDEF LINUX}
-  Log.d(ALog);
-{$ENDIF}
+  ATOutputDebugStr(ALog);
 end;
 
 { TATLogIdentifier }
@@ -1736,7 +1514,7 @@ begin
   FStreamReader := TStreamReader.Create(AFileName, TEncoding.UTF8, True, TEXT_BUFFERSIZE);
 {$ELSE}
 
-  if GetFileSize(AFileName) > TEXTFILE_LIMITSIZE then
+  if ATGetFileSize(AFileName) > TEXTFILE_LIMITSIZE then
     Exit;
 
   AssignFile(FTextFile, AFileName);
@@ -1825,7 +1603,7 @@ function TATFileLogOutputter.GetOutputLogFileName: string;
     LNameWithoutExt := ChangeFileExt(AOriginalLogFileName, '');
     LFileNameExt    := ExtractFileExt(AOriginalLogFileName);
 
-    while GetFileSize(Result) > FMaxSingleFileSize do
+    while ATGetFileSize(Result) > FMaxSingleFileSize do
     begin
       Result := LNameWithoutExt + FILENAME_SUFFIX + IntToStr(LFileNameIndex) + LFileNameExt;
       Inc(LFileNameIndex);
@@ -2006,14 +1784,14 @@ procedure TATLogFileCleaner.DoDirFound(const ADir: string);
 
   function IsDirectoryEmpty(const ADirectory: string): Boolean;
   var
-    LSearchRec: TSearchRec;
+    LSearchRec: SysUtils.TSearchRec;
   begin
     try
-      Result := (FindFirst(IncludeTrailingPathDelimiter(ADirectory) + '*.*', faAnyFile, LSearchRec) = 0) and
-                (FindNext(LSearchRec) = 0) and
-                (FindNext(LSearchRec) <> 0);
+      Result := (SysUtils.FindFirst(IncludeTrailingPathDelimiter(ADirectory) + '*.*', faAnyFile, LSearchRec) = 0) and
+                (SysUtils.FindNext(LSearchRec) = 0) and
+                (SysUtils.FindNext(LSearchRec) <> 0);
     finally
-      FindClose(LSearchRec);
+      SysUtils.FindClose(LSearchRec);
     end;
   end;
 
@@ -2085,7 +1863,7 @@ procedure TATLogFileCleaner.Execute;
         LFound := FindNext(LSearchRec);
       end;
     finally
-      FindClose(LSearchRec);
+      SysUtils.FindClose(LSearchRec);
     end;
 
     DoDirFound(LRootDir);
@@ -2102,23 +1880,31 @@ begin
   end;
 end;
 
-initialization;
-
+procedure DoInit;
+begin
   InternalThreadLock := TATLogSynchro.Create;
 
-  InternalOSName   := GetOSName;
-  InternalAppName  := {$IFDEF MSWINDOWS}Application.Title{$ELSE}Application.DefaultTitle{$ENDIF};
+  InternalOSName   := ATGetOSName;
+  InternalAppName  := ATGetPureAppName;
   InternalTimeZone := GetTimeZone;
 
   InternalDefaultLogFileName    := GetDefaultLogPath + InternalAppName + '.log';
-  InternalDefaultFormatSettings := GetFormatSettings;
+  InternalDefaultFormatSettings := ATGetFormatSettings;
+end;
 
-finalization
-
+procedure DoUninit;
+begin
   InternalDefaultLogger := nil;
   FreeAndNil(InternalThreadLock);
 {$IFDEF DEBUG_LOG}
   Assert(InternalLogInstanceCount = 0);
-{$ENDIF}  
+{$ENDIF}
+end;
+
+initialization;
+  DoInit;
+
+finalization
+  DoUninit;
 
 end.

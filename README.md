@@ -1,14 +1,14 @@
 ## Delphi Auxiliary Toolkit
- A set of units for delphi, the purposes is to simplify development, it should supports delphi7 and above(tested in D7, TD, XE2, XE5, XE7, D10, D10.1, D10.2, D10.3, D10.4, D11) and the platforms Windows(XP or later) and Android(MacOS and iOS not tested).
+ A set of units for delphi and FPC(Most units support), the purposes is to simplify development, it should supports delphi7 and above(tested in D7, TD, XE2, XE5, XE7, D10, D10.1, D10.2, D10.3, D10.4, D11) and platforms Windows(XP or later) and Android(MacOS and iOS not tested), when use FPC, it should supports many platforms and architectures such as Win, Linux|X86/X64, arm/aarch64 and ect.
 ## Install
  Clone the repository, and add units to your project. 
 ## Features  
-- ATLibraryLoader: implements a common interface to easily access from delphi to different kinds of profiles(ini, registry, xml, json, and db profiles).
-- ATLogger: A lightweight logging for delphi based applications.
-- ATLibraryLoader: makes use dlls becomes simple.
-- ATTimeWatcher:A very lightweight stopwatch.
-- ATOnlyOneAppInst: Ensure only a single instance of the application runs.
-- ATTimer: A high-precision timer in MSWindows.
+- ATLibraryLoader(Currently Delphi only): implements a common interface to easily access from delphi to different kinds of profiles(ini, registry, xml, json, and db profiles).
+- ATLogger(Delphi and FPC): A lightweight logging for Delphi/FPC based applications.
+- ATLibraryLoader(Currently Delphi only): makes use dlls becomes simple.
+- ATTimeWatcher(Delphi and FPC): A very lightweight stopwatch.
+- ATOnlyOneAppInst(Currently Delphi only): Ensure only a single instance of the application runs.
+- ATTimer(Delphi and FPC): A high-precision timer in MSWindows.
 ## Useage
 Note: These examples are for Windows and the used file paths are hard-coded, so you may make a little changes if the paths not exist or you want to compile to other platforms,  there are some complete examples in the samples folder.
 #### ATConfigurator:

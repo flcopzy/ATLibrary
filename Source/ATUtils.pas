@@ -29,6 +29,14 @@ unit ATUtils;
 
 {$I AT.inc}
 
+{$IFDEF USE_DELPHI}
+  {$IFDEF CONDITIONALEXPRESSIONS}
+    {$IF CompilerVersion >= 25.0}
+      {$LEGACYIFEND ON}
+    {$IFEND}
+  {$ENDIF}
+{$ENDIF}
+
 interface
 
 uses
@@ -40,6 +48,7 @@ uses
 {$ENDIF}
 
 {$IFDEF USE_DELPHI}
+  {$IFNDEF MSWINDOWS}, System.IOUtils, FMX.Platform{$ENDIF}
   {$IFDEF ANDROID}
     , Androidapi.Log
   {$ENDIF}
@@ -268,8 +277,23 @@ begin
 end;
 
 function ATGetPureAppName: string;
+{$IF Defined(USE_DELPHI) and not Defined(MSWINDOWS)}
+var
+  LAppService: IFMXApplicationService;
+{$IFEND}
 begin
   Result := ChangeFileExt(ExtractFileName(ATGetAppFullName()), '');
+{$IF Defined(USE_DELPHI) and not Defined(MSWINDOWS)}
+  if Result = '' then
+  begin
+    if TPlatformServices.Current.SupportsPlatformService(IFMXApplicationService, LAppService) then
+    begin
+      Result := LAppService.Title;
+      if Result = '' then
+        Result := LAppService.DefaultTitle;
+    end;
+  end;
+{$IFEND}
 end;
 
 function ATGetAppPath: string;

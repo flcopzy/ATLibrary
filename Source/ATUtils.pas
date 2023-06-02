@@ -423,7 +423,12 @@ begin
   EnterCriticalSection(GDSiWndHandlerCritSect);
   try
     alreadyRegistered := GetClassInfo(HInstance, CDSiHiddenWindowName, tempClass);
+  {$IFDEF USE_DELPHI}
+    if (not alreadyRegistered) or (tempClass.lpfnWndProc <> @DSiClassWndProc) then begin
+  {$ELSE}
     if (not alreadyRegistered) or (@tempClass.lpfnWndProc <> @DSiClassWndProc) then begin
+  {$ENDIF}
+
       if alreadyRegistered then
         Windows.UnregisterClass(CDSiHiddenWindowName, HInstance);
       utilWindowClass.lpszClassName := CDSiHiddenWindowName;
@@ -431,13 +436,13 @@ begin
       utilWindowClass.lpfnWndProc := @DSiClassWndProc;
       utilWindowClass.cbWndExtra := SizeOf(TMethod);
       if Windows.RegisterClass(utilWindowClass) = 0 then
-        raise Exception.CreateFmt('Unable to register DSiWin32 hidden window class. %s',
+        raise Exception.CreateFmt('Unable to register ATLibrary-DSiWin32 hidden window class. %s',
           [SysErrorMessage(GetLastError)]);
     end;
     Result := CreateWindowEx(WS_EX_TOOLWINDOW, CDSiHiddenWindowName, '', WS_POPUP,
       0, 0, 0, 0, 0, 0, HInstance, nil);
     if Result = 0 then
-      raise Exception.CreateFmt('Unable to create DSiWin32 hidden window. %s',
+      raise Exception.CreateFmt('Unable to create ATLibrary-DSiWin32 hidden window. %s',
               [SysErrorMessage(GetLastError)]);
     {$IFDEF CPU_IS_64BITS}
     SetWindowLongPtr(Result, GWL_METHODDATA, NativeInt(TMethod(wndProcMethod).Data));

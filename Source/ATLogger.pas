@@ -65,6 +65,9 @@
 
   Version 1.007 by ZY:
     (2023.04.03) + FPC supported.
+
+  Version 1.008 by ZY:
+    (2023.12.14) + fixed IsLogFile may raise exception.
     
 *)
 
@@ -102,6 +105,7 @@ uses
   {$IFDEF HAS_IOUTILS}
     , {$IFDEF HAS_UNIT_SCOPE}System.IOUtils{$ELSE}IOUtils{$ENDIF}
   {$ENDIF}
+  {$IFDEF POSIX}, Posix.Unistd{$ENDIF}{ for inline DeleteFile }
 {$ELSE}
   { FPC }
   {$IFDEF MSWINDOWS}
@@ -115,7 +119,7 @@ uses
 
 const
 
-  ATLoggerVersion = '1.007';
+  ATLoggerVersion = '1.008';
 
 type
 
@@ -507,6 +511,24 @@ var
   { Default format settings for internal use. }
   InternalDefaultFormatSettings: TFormatSettings;
 
+procedure ATNativeOutput(const ALog: string; ALogLevel: TATLogLevel); {$IFDEF HAS_INLINE}inline;{$ENDIF}
+begin
+  ATOutputDebugStr(LOG_LEVEL_CAPTIONS[ALogLevel] + ' ' + ALog);
+end;
+
+procedure ATLogError(const AHeader, AExceptionMessage: string);
+var
+  LExceptionMessage, LHeader: string;
+begin
+  if AExceptionMessage = '' then
+    Exit;
+
+  LHeader := 'ATLogger\' + AHeader;
+
+  LExceptionMessage := Format('%s : %s', [LHeader, AExceptionMessage], InternalDefaultFormatSettings);
+  ATNativeOutput(LExceptionMessage, llError);
+end;
+
 function GetTimeZone: string;
 begin
   Result := 'GMT' + ATGetLocalTimeZoneBiasStr;
@@ -514,12 +536,14 @@ end;
 
 procedure DelDirectory(const ADir: string);
 begin
-  SysUtils.RemoveDir(ADir);
+  if not SysUtils.RemoveDir(ADir) then
+    ATLogError('RemoveDir ' + ADir, ATGetLastErrorMsg);
 end;
 
 procedure DelFile(const AFileName: string);
 begin
-  SysUtils.DeleteFile(AFileName);
+  if not SysUtils.DeleteFile(AFileName) then
+    ATLogError('DelFile ' + AFileName, ATGetLastErrorMsg);
 end;
 
 function GetDefaultLogPath: string;
@@ -554,8 +578,6 @@ type
   TATDefaultLogOutputter = class(TATAsyncLogOutputter)
   protected
     procedure DoAsycLog(const ALogs: TATLogElementList); override;
-  public
-    class procedure NativeOutput(const ALog: string; ALogLevel: TATLogLevel); {$IFDEF HAS_INLINE}inline;{$ENDIF}
   end;
 
   TATFileLogOutputter = class(TATAsyncLogOutputter)
@@ -627,7 +649,7 @@ type
     FEnabled: Boolean;
     FWaitforFinishedWhenTerminated: Boolean;
     procedure DoLog(const ALog: string; const ALogLevel: TATLogLevel); {$IFDEF HAS_INLINE}inline;{$ENDIF}
-    procedure DoLogException(AExceptionTriger: TObject; const AExceptionMessage: string);
+    procedure DoLogException(AExceptionTrigger: TObject; const AExceptionMessage: string);
   protected
     { IATLogger }
     function GetLogLevel: TATLogLevel;
@@ -721,17 +743,13 @@ begin
     FLogOutputter.Output(ALog, ALogLevel);
 end;
 
-procedure TATLoggerContext.DoLogException(AExceptionTriger: TObject;
+procedure TATLoggerContext.DoLogException(AExceptionTrigger: TObject;
   const AExceptionMessage: string);
-var
-  LExceptionMessage: string;
 begin
-  if (AExceptionTriger = nil) or (AExceptionMessage = '') then
-    Exit;
-
-  LExceptionMessage := FormatDateTime(LOG_DEFAULT_DATETIMEFORMAT, Now(), InternalDefaultFormatSettings)
-    + LOG_LEVEL_CAPTIONS[llError] + ' ' + AExceptionTriger.ClassName + ': ' + AExceptionMessage;
-  TATDefaultLogOutputter.NativeOutput(LExceptionMessage, llError);
+  if AExceptionTrigger <> nil then
+    ATLogError(AExceptionTrigger.ClassName, AExceptionMessage)
+  else
+    ATLogError('', AExceptionMessage);
 end;
 
 procedure TATLoggerContext.E(const AErrorStr: string; const AArgs: array of const;
@@ -1355,13 +1373,8 @@ begin
   for I := 0 to ALogs.Count - 1 do
   begin
     LLogElement := ALogs[I];
-    NativeOutput(FLogFormater.LogFormat(LLogElement), LLogElement.LogLevel);
+    ATNativeOutput(FLogFormater.LogFormat(LLogElement), LLogElement.LogLevel);
   end;
-end;
-
-class procedure TATDefaultLogOutputter.NativeOutput(const ALog: string; ALogLevel: TATLogLevel);
-begin
-  ATOutputDebugStr(ALog);
 end;
 
 { TATLogIdentifier }
@@ -1619,13 +1632,27 @@ var
   LTextReader: TATTextReadWrapper;
   LHeader: string;
 begin
-  LTextReader := TATTextReadWrapper.Create(AFileName);
+  Result := False;
+  
+  try
+    LTextReader := TATTextReadWrapper.Create(AFileName);
+  except
+    on E: Exception do
+    begin
+      { Can't open the file, ignored. }
+      ATLogError('IsLogFile Open ' + AFileName, E.Message);
+      Exit;
+    end;
+  end;
+
   try
     try
       LHeader := LTextReader.ReadStrln;
       Result := TATLogIdentifier.ContainLogIdentifier(LHeader);
     except
-      Result := False;
+      on E: Exception do
+        { Can't read the file, ignored. }
+        ATLogError('IsLogFile Read ' + AFileName, E.Message);
     end;
   finally
     LTextReader.Free;
@@ -1810,7 +1837,11 @@ begin
   try
     LLogFileNeedDeleted := not Assigned(FLogFileFoundFunc) or FLogFileFoundFunc(AFileName);
   except
-    LLogFileNeedDeleted := False;
+    on E: Exception do
+    begin
+      ATLogError('LogFileFoundFunc from ' + AFileName, E.Message);
+      LLogFileNeedDeleted := False;
+    end;
   end;
 
   if LLogFileNeedDeleted then
